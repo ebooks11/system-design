@@ -1,0 +1,2722 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>System Design — 25 Real-World Architecture Patterns | Interactive Blueprint</title>
+  <style>
+    /* ==========================================================================
+       CSS DESIGN SYSTEM & ARCHITECTURAL BLUEPRINT TOKENS
+       Self-contained styles (Zero external CSS dependencies for offline/static hosting)
+       ========================================================================== */
+    :root {
+      --bg-app: #f4f7fb;
+      --bg-surface: #ffffff;
+      --bg-surface-alt: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-blueprint: #f0f5fa;
+      --grid-line: rgba(14, 116, 144, 0.08);
+      --border-color: #cbd5e1;
+      --border-strong: #94a3b8;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+      --accent: #0284c7;
+      --accent-hover: #0369a1;
+      --accent-soft: rgba(2, 132, 199, 0.12);
+      --accent-secondary: #7c3aed;
+      --accent-secondary-soft: rgba(124, 58, 237, 0.12);
+      --success: #059669;
+      --success-soft: rgba(5, 150, 105, 0.12);
+      --warning: #d97706;
+      --warning-soft: rgba(217, 119, 6, 0.12);
+      --danger: #dc2626;
+      --danger-soft: rgba(220, 38, 38, 0.12);
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    html.dark {
+      --bg-app: #090e17;
+      --bg-surface: #0f172a;
+      --bg-surface-alt: #131d33;
+      --bg-card: #111a2e;
+      --bg-blueprint: #0b1324;
+      --grid-line: rgba(56, 189, 248, 0.06);
+      --border-color: #1e293b;
+      --border-strong: #334155;
+      --text-primary: #f1f5f9;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #7dd3fc;
+      --accent-soft: rgba(56, 189, 248, 0.14);
+      --accent-secondary: #a78bfa;
+      --accent-secondary-soft: rgba(167, 139, 250, 0.14);
+      --success: #34d399;
+      --success-soft: rgba(52, 211, 153, 0.14);
+      --warning: #fbbf24;
+      --warning-soft: rgba(251, 191, 36, 0.14);
+      --danger: #f87171;
+      --danger-soft: rgba(248, 113, 113, 0.14);
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 6px 24px rgba(0, 0, 0, 0.45);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-app);
+      color: var(--text-primary);
+      line-height: 1.6;
+      overflow-x: hidden;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    /* ==========================================================================
+       APP LAYOUT: SIDEBAR + MAIN STAGE
+       ========================================================================== */
+    .app-shell {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Sidebar Navigation */
+    .sidebar {
+      width: 295px;
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 50;
+      transition: transform 0.3s ease;
+    }
+
+    .sidebar-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 0.98rem;
+      letter-spacing: -0.01em;
+    }
+
+    .brand-badge {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+
+    .sidebar-search {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-color);
+      background: var(--bg-surface-alt);
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .nav-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 10px 24px;
+      list-style: none;
+    }
+
+    .nav-item {
+      margin-bottom: 4px;
+    }
+
+    .nav-btn {
+      width: 100%;
+      text-align: left;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.15s ease;
+    }
+
+    .nav-btn:hover {
+      background: var(--bg-surface-alt);
+      color: var(--text-primary);
+    }
+
+    .nav-btn.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-color: rgba(56, 189, 248, 0.25);
+      font-weight: 600;
+    }
+
+    .nav-num {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: var(--bg-surface-alt);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .nav-btn.active .nav-num {
+      background: var(--accent);
+      color: #090e17;
+      border-color: var(--accent);
+      font-weight: 700;
+    }
+
+    /* Main Content Wrapper */
+    .main-wrapper {
+      flex: 1;
+      margin-left: 295px;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    /* Top Header */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .menu-toggle {
+      display: none;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-color);
+      background: var(--bg-surface-alt);
+      color: var(--text-primary);
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    .breadcrumb {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-color);
+      background: var(--bg-surface-alt);
+      color: var(--text-primary);
+      font-size: 0.83rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #06121e;
+      border-color: var(--accent);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      color: #06121e;
+    }
+
+    .btn-sm {
+      padding: 6px 11px;
+      font-size: 0.78rem;
+    }
+
+    .btn.active-pill {
+      background: var(--accent);
+      color: #06121e;
+      border-color: var(--accent);
+    }
+
+    /* Main Content Container */
+    .content-area {
+      max-width: 1260px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 28px 24px 72px;
+    }
+
+    .section-panel {
+      display: none;
+      animation: fadeIn 0.25s ease;
+    }
+
+    .section-panel.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Section Hero Header */
+    .section-hero {
+      margin-bottom: 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .section-tag {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .section-title {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+
+    .section-desc {
+      color: var(--text-secondary);
+      font-size: 0.96rem;
+      max-width: 820px;
+    }
+
+    /* ==========================================================================
+       CARDS, GRIDS, BLUEPRINT CANVAS & TABLES
+       ========================================================================== */
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .mb-4 { margin-bottom: 16px; }
+    .mb-6 { margin-bottom: 24px; }
+    .mt-4 { margin-top: 16px; }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Architectural Blueprint Canvas */
+    .blueprint-box {
+      background-color: var(--bg-blueprint);
+      background-image:
+        linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+      background-size: 22px 22px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      position: relative;
+      overflow-x: auto;
+    }
+
+    .blueprint-label {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    /* Lists & Badges */
+    .check-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .check-list li {
+      position: relative;
+      padding-left: 22px;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .check-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--success);
+      font-weight: 800;
+    }
+
+    .cross-list li::before {
+      content: "!";
+      color: var(--warning);
+    }
+
+    .interview-callout {
+      background: linear-gradient(135deg, var(--accent-soft), var(--accent-secondary-soft));
+      border-left: 4px solid var(--accent);
+      border-radius: var(--radius-sm);
+      padding: 14px 18px;
+      margin-top: 18px;
+      font-size: 0.9rem;
+    }
+
+    .interview-callout strong {
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      font-family: var(--font-mono);
+    }
+    .badge-blue { background: var(--accent-soft); color: var(--accent); }
+    .badge-purple { background: var(--accent-secondary-soft); color: var(--accent-secondary); }
+    .badge-green { background: var(--success-soft); color: var(--success); }
+    .badge-amber { background: var(--warning-soft); color: var(--warning); }
+    .badge-red { background: var(--danger-soft); color: var(--danger); }
+
+    /* Tables */
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.87rem;
+      text-align: left;
+    }
+
+    th {
+      background: var(--bg-surface-alt);
+      padding: 11px 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      border-bottom: 1px solid var(--border-color);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      vertical-align: top;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--bg-surface-alt); }
+
+    /* Interactive Diagram Nodes */
+    .node-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .arch-node {
+      background: var(--bg-surface);
+      border: 2px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      min-width: 135px;
+      text-align: center;
+      transition: all 0.25s ease;
+      position: relative;
+    }
+
+    .arch-node.clickable { cursor: pointer; }
+    .arch-node.clickable:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+    .arch-node.highlight {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      box-shadow: 0 0 18px var(--accent-soft);
+    }
+
+    .arch-node.success-node {
+      border-color: var(--success);
+      background: var(--success-soft);
+    }
+
+    .arch-node.danger-node {
+      border-color: var(--danger);
+      background: var(--danger-soft);
+    }
+
+    .arch-node.warn-node {
+      border-color: var(--warning);
+      background: var(--warning-soft);
+    }
+
+    .node-title { font-weight: 700; font-size: 0.88rem; color: var(--text-primary); }
+    .node-sub { font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px; }
+
+    .arrow-connector {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+    }
+
+    .sim-log {
+      margin-top: 12px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Form Controls */
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .input-group label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .input-field, select.input-field {
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-color);
+      background: var(--bg-surface-alt);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+    }
+
+    .stat-box {
+      background: var(--bg-surface-alt);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      text-align: center;
+    }
+
+    .stat-val {
+      font-family: var(--font-mono);
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .stat-lbl {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Progress Bar */
+    .progress-bar-bg {
+      height: 10px;
+      background: var(--bg-surface-alt);
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--success));
+      transition: width 0.3s ease;
+    }
+
+    /* Section Footer Navigation */
+    .section-footer-nav {
+      margin-top: 32px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--bg-surface);
+      border: 1px solid var(--accent);
+      color: var(--text-primary);
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      font-size: 0.84rem;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(10px);
+      transition: all 0.25s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Responsive Breakpoints */
+    @media (max-width: 960px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+      }
+      .main-wrapper {
+        margin-left: 0;
+      }
+      .menu-toggle {
+        display: inline-flex;
+      }
+      .grid-2, .grid-3, .grid-4 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-shell">
+  <!-- ======================================================================
+       SIDEBAR NAVIGATION (All 13 Core Modules covering all 14 PDF Pages)
+       ====================================================================== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <div class="brand-badge">SD25</div>
+        <div>
+          <div>System Design</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 500;">25 Architecture Patterns</div>
+        </div>
+      </div>
+      <button class="btn btn-sm" id="closeSidebarBtn" style="display:none;" onclick="toggleSidebar(false)">✕</button>
+    </div>
+
+    <div class="sidebar-search">
+      <input type="text" id="navSearchInput" class="search-input" placeholder="Filter topics or patterns..." oninput="filterNavigation(this.value)" />
+    </div>
+
+    <ul class="nav-list" id="navList">
+      <li class="nav-item" data-keywords="overview 25 patterns cheat sheet interview framework nfr capacity calculator trade-offs checklist">
+        <button class="nav-btn active" data-target="sec-overview" onclick="switchSection('sec-overview')">
+          <span class="nav-num">01</span> <span>Overview &amp; 25-Pattern Cheat Sheet</span>
+        </button>
+      </li>
+      <li class="nav-item" data-keywords="layered monolithic presentation business data access database mvp">
+        <button class="nav-btn" data-target="sec-layered" onclick="switchSection('sec-layered')">
+          <span class="nav-num">02</span> <span>Layered &amp; Monolithic</span>
+        </button>
+      </li>
+      <li class="nav-item" data-keywords="microservices api gateway jwt routing rate limiting user order payment db">
+        <button class="nav-btn" data-target="sec-microservices" onclick="switchSection('sec-microservices')">
+          <span class="nav-num">03</span> <span>Microservices Architecture</span>
+        </button>
+      </li>
+      <li class="nav-item" data-keywords="event driven producer broker consumer kafka rabbitmq choreography orchestration">
+        <button class="nav-btn" data-target="sec-event-driven" onclick="switchSection('sec-event-driven')">
+          <span class="nav-num">04</span> <span>Event-Driven Architecture</span>
+        </button>
+      </li>
+      <li class="nav-item" data-keywords="message queue pub sub point to point topic consumer groups delivery guarantees kafka rabbitmq">
+        <button class="nav-btn" data-target="sec-messaging" onclick="switchSection('sec-messaging')">
+          <span class="nav-num">05</span> <span>Message Queue &amp; Pub/Sub</span>
+        </button>
+      </li>
+      <li class="nav-item" data-keywords="cqrs event sourcing command query read write model projection replay">
+        <button class="nav-btn" data-target="sec-cqrs" onclick="switchSection('sec-cqrs')">
+          <span class="nav-num">06</span> <span>CQRS &amp; Event Sourcing</span>
+        </button>
+      </li>
+      <li class="nav-item" data-keywords="database sharding partitioning replication read replicas leader follower sql nosql">
+        <button class="nav-btn" data-target="sec-database" onclick="switchSection('sec-database')">
+          <span class="nav-num">07</span> <span>Database Architecture</span>
+        </button>
+      </li>
+      <li class="nav-item" data-keywords="caching redis memcached cache-aside write-through write-back write-around ttl invalidation">
+        <button class="nav-btn" data-target="sec-caching" onclick="switchSection('sec-caching')">
+          <span class="nav-num">08</span> <span>Caching Architecture</span>
+        </button>
+      </li>
+      <li class="nav-item" data-keywords="scalability horizontal vertical load balancer round robin least connections rate limiting circuit breaker bulkhead throttling backpressure autoscaling">
+        <button class="nav-btn" data-target="sec-scalability" onclick="switchSection('sec-scalability')">
+          <span class="nav-num">09</span> <span>Scalability &amp; Traffic Mgmt</span>
+        </button>
+      </li>
+      <li class="nav-item" data-keywords="distributed systems saga strangler fig retry exponential backoff idempotency timeout fallback">
+        <button class="nav-btn" data-target="sec-distributed" onclick="switchSection('sec-distributed')">
+          <span class="nav-num">10</span> <span>Distributed Systems Patterns</span>
+        </button>
+      </li>
+      <li class="nav-item" data-keywords="reliability availability fault tolerance high availability spof disaster recovery rpo rto active-active active-passive observability metrics logs traces">
+        <button class="nav-btn" data-target="sec-reliability" onclick="switchSection('sec-reliability')">
+          <span class="nav-num">11</span> <span>Reliability &amp; Fault Tolerance</span>
+        </button>
+      </li>
+      <li class="nav-item" data-keywords="data processing batch stream lambda kappa spark flink airflow">
+        <button class="nav-btn" data-target="sec-data-processing" onclick="switchSection('sec-data-processing')">
+          <span class="nav-num">12</span> <span>Data Processing Patterns</span>
+        </button>
+      </li>
+      <li class="nav-item" data-keywords="real world case studies netflix uber whatsapp youtube instagram">
+        <button class="nav-btn" data-target="sec-case-studies" onclick="switchSection('sec-case-studies')">
+          <span class="nav-num">13</span> <span>Real-World Case Studies</span>
+        </button>
+      </li>
+    </ul>
+  </aside>
+
+  <!-- ======================================================================
+       MAIN CONTENT STAGE
+       ====================================================================== -->
+  <div class="main-wrapper">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="menu-toggle" onclick="toggleSidebar(true)">☰ Sections</button>
+        <div class="breadcrumb" id="topBreadcrumb">HANDBOOK // 01. OVERVIEW &amp; MASTER CHEAT SHEET</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-sm" id="themeToggleBtn" onclick="toggleTheme()">☀️ Light Mode</button>
+        <button class="btn btn-sm btn-primary" onclick="downloadStandaloneHTML()">⬇ Download Standalone HTML</button>
+      </div>
+    </header>
+
+    <main class="content-area">
+
+      <!-- ====================================================================
+           SECTION 01: OVERVIEW, 25 PATTERNS CHEAT SHEET, CALCULATOR & REVISION
+           ==================================================================== -->
+      <section id="sec-overview" class="section-panel active">
+        <div class="section-hero">
+          <span class="section-tag">Pages 1 &amp; 15 // Master Blueprint &amp; Interview Revision</span>
+          <h1 class="section-title">System Design — 25 Real-World Architecture Patterns</h1>
+          <p class="section-desc">
+            Interactive engineering handbook covering core &amp; advanced architecture styles, scalability, fault tolerance, distributed transactions, data processing pipelines, and production case studies (Netflix, Uber, WhatsApp, YouTube, Instagram).
+          </p>
+        </div>
+
+        <!-- 5-Step System Design Interview Framework -->
+        <div class="card mb-6">
+          <div class="card-header">
+            <h2 class="card-title">🧭 5-Step System Design Interview Framework</h2>
+            <span class="badge badge-blue">Structured Approach</span>
+          </div>
+          <div class="blueprint-box">
+            <div class="node-row">
+              <div class="arch-node highlight">
+                <div class="node-title">1. Clarify Requirements</div>
+                <div class="node-sub">Scope, users, core features</div>
+              </div>
+              <div class="arrow-connector">→</div>
+              <div class="arch-node">
+                <div class="node-title">2. Estimate &amp; Constraints</div>
+                <div class="node-sub">QPS, storage, latency, SLA</div>
+              </div>
+              <div class="arrow-connector">→</div>
+              <div class="arch-node">
+                <div class="node-title">3. High-Level Design (HLD)</div>
+                <div class="node-sub">Services, DB, Cache, Queue, CDN</div>
+              </div>
+              <div class="arrow-connector">→</div>
+              <div class="arch-node">
+                <div class="node-title">4. Deep Dive (LLD)</div>
+                <div class="node-sub">Data model, APIs, sharding</div>
+              </div>
+              <div class="arrow-connector">→</div>
+              <div class="arch-node success-node">
+                <div class="node-title">5. Trade-offs &amp; Wrap-up</div>
+                <div class="node-sub">Bottlenecks, alternatives</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Capacity Estimation Calculator -->
+        <div class="card mb-6">
+          <div class="card-header">
+            <h2 class="card-title">🧮 Interactive Capacity Estimation Calculator</h2>
+            <span class="badge badge-purple">Live Back-of-the-Envelope Math</span>
+          </div>
+          <div class="grid-4 mb-4">
+            <div class="input-group">
+              <label>Daily Active Users (DAU)</label>
+              <input type="number" id="calcUsers" class="input-field" value="1000000" min="1" oninput="calculateCapacity()" />
+            </div>
+            <div class="input-group">
+              <label>Requests / User / Day</label>
+              <input type="number" id="calcReqPerUser" class="input-field" value="20" min="1" oninput="calculateCapacity()" />
+            </div>
+            <div class="input-group">
+              <label>Data Stored / User (KB)</label>
+              <input type="number" id="calcDataPerUser" class="input-field" value="50" min="1" oninput="calculateCapacity()" />
+            </div>
+            <div class="input-group">
+              <label>Avg Response Size (KB) &amp; Buffer</label>
+              <div style="display:flex; gap:6px;">
+                <input type="number" id="calcRespSize" class="input-field" style="width:55%;" value="10" min="1" oninput="calculateCapacity()" />
+                <select id="calcBuffer" class="input-field" style="width:45%;" onchange="calculateCapacity()">
+                  <option value="2">2x Peak</option>
+                  <option value="3" selected>3x Peak</option>
+                  <option value="5">5x Peak</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="grid-4">
+            <div class="stat-box">
+              <div class="stat-val" id="resDailyReq">20.0M</div>
+              <div class="stat-lbl">Daily Requests (Users × Req)</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-val" id="resQPS">231.5 / 694.4</div>
+              <div class="stat-lbl">Avg QPS / Peak QPS (÷ 86,400)</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-val" id="resStorage">47.68 GB</div>
+              <div class="stat-lbl">Total Storage (Data × Users)</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-val" id="resBandwidth">2.26 MB/s</div>
+              <div class="stat-lbl">Avg Bandwidth (QPS × Resp)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Master 25 Architecture Patterns Cheat Sheet -->
+        <div class="card mb-6">
+          <div class="card-header">
+            <h2 class="card-title">📋 All 25 Architecture Patterns — Master Cheat Sheet</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <input type="text" id="patternSearch" class="input-field" placeholder="Search 25 patterns..." oninput="renderPatternTable()" />
+              <select id="patternCatFilter" class="input-field" onchange="renderPatternTable()">
+                <option value="ALL">All Categories (25)</option>
+                <option value="Traffic & Routing">Traffic &amp; Routing</option>
+                <option value="Resilience">Resilience &amp; Fault Tolerance</option>
+                <option value="Distributed">Distributed &amp; Migration</option>
+                <option value="Data & Caching">Data &amp; Caching</option>
+                <option value="Processing">Data Processing</option>
+                <option value="Availability">High Availability &amp; DR</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Pattern Name</th>
+                  <th>Category</th>
+                  <th>One-Line Use Case</th>
+                  <th>Explore</th>
+                </tr>
+              </thead>
+              <tbody id="patternsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- NFRs, Common Trade-offs & Revision Checklist -->
+        <div class="grid-2 mb-6">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">⚖️ Key Non-Functional Requirements (NFRs)</h3>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>NFR</th><th>Target / Meaning</th></tr></thead>
+                <tbody>
+                  <tr><td><strong>Scalability</strong></td><td>Handle growth in users &amp; traffic (e.g., 10x load).</td></tr>
+                  <tr><td><strong>Availability</strong></td><td>System is up and accessible (e.g., 99.99% uptime).</td></tr>
+                  <tr><td><strong>Reliability</strong></td><td>Works correctly &amp; consistently (zero data loss).</td></tr>
+                  <tr><td><strong>Performance</strong></td><td>Low latency &amp; high throughput (e.g., &lt; 200ms).</td></tr>
+                  <tr><td><strong>Security</strong></td><td>Authentication (JWT), authorization, encryption.</td></tr>
+                  <tr><td><strong>Consistency</strong></td><td>Correct &amp; up-to-date data (Strong vs. Eventual).</td></tr>
+                  <tr><td><strong>Maintainability</strong></td><td>Easy to operate, debug, observe, and extend.</td></tr>
+                  <tr><td><strong>Cost Efficiency</strong></td><td>Meet SLAs within budget (right-sizing, caching, CDN).</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">🔀 Common Architectural Trade-offs</h3>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Choice</th><th>Trade-off</th></tr></thead>
+                <tbody>
+                  <tr><td><strong>SQL vs. NoSQL</strong></td><td>ACID &amp; rich queries vs. horizontal scale &amp; schema flexibility</td></tr>
+                  <tr><td><strong>Strong vs. Eventual</strong></td><td>Always up-to-date reads vs. higher availability &amp; lower latency</td></tr>
+                  <tr><td><strong>Sync vs. Async</strong></td><td>Immediate response vs. decoupling, buffering &amp; resilience</td></tr>
+                  <tr><td><strong>Cache vs. No Cache</strong></td><td>Sub-ms reads &amp; lower DB load vs. invalidation complexity</td></tr>
+                  <tr><td><strong>Monolith vs. Microservices</strong></td><td>Simplicity &amp; speed vs. independent scale &amp; fault isolation</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Interview Revision Checklist -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">✅ Pre-Interview Revision Checklist</h3>
+            <span class="badge badge-green" id="checklistProgressLabel">0 / 5 Completed</span>
+          </div>
+          <div class="progress-bar-bg mb-4">
+            <div class="progress-bar-fill" id="checklistProgressBar" style="width: 0%;"></div>
+          </div>
+          <div id="revisionChecklist" style="display:flex; flex-direction:column; gap:10px;"></div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           SECTION 02: LAYERED & MONOLITHIC ARCHITECTURE (Page 2)
+           ==================================================================== -->
+      <section id="sec-layered" class="section-panel">
+        <div class="section-hero">
+          <span class="section-tag">Page 2 // Foundational Architecture</span>
+          <h1 class="section-title">Layered Architecture &amp; Monolithic Architecture</h1>
+          <p class="section-desc">
+            Understanding how code is logically structured into tiers (Layered) versus how an application is packaged and deployed as a single unit (Monolithic).
+          </p>
+        </div>
+
+        <div class="grid-2 mb-6">
+          <!-- Interactive Layered Architecture Explorer -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">1. Layered Architecture (N-Tier)</h2>
+              <span class="badge badge-blue">Click any layer</span>
+            </div>
+            <p style="font-size:0.88rem; color:var(--text-secondary); margin-bottom:14px;">
+              Organizes an application into logical horizontal layers. Each layer talks <strong>only to the layer directly below it</strong>.
+            </p>
+            <div class="blueprint-box">
+              <div style="display:flex; flex-direction:column; gap:10px; max-width:380px; margin:0 auto;">
+                <div class="arch-node clickable highlight" id="layer-0" onclick="selectLayer(0)">
+                  <div class="node-title">Presentation Layer (UI / API)</div>
+                  <div class="node-sub">Controllers, Views, Request/Response</div>
+                </div>
+                <div style="text-align:center; color:var(--accent); font-weight:700;">↓ Calls ↓</div>
+                <div class="arch-node clickable" id="layer-1" onclick="selectLayer(1)">
+                  <div class="node-title">Business Logic Layer (Service)</div>
+                  <div class="node-sub">Domain Rules, Validations, Workflows</div>
+                </div>
+                <div style="text-align:center; color:var(--accent); font-weight:700;">↓ Calls ↓</div>
+                <div class="arch-node clickable" id="layer-2" onclick="selectLayer(2)">
+                  <div class="node-title">Data Access Layer (Repository / DAO)</div>
+                  <div class="node-sub">ORM, SQL Queries, CRUD Operations</div>
+                </div>
+                <div style="text-align:center; color:var(--accent); font-weight:700;">↓ Persists ↓</div>
+                <div class="arch-node clickable" id="layer-3" onclick="selectLayer(3)">
+                  <div class="node-title">Database Layer</div>
+                  <div class="node-sub">MySQL, PostgreSQL, MongoDB</div>
+                </div>
+              </div>
+              <div class="sim-log" id="layerDetailLog">
+                <strong>Presentation Layer:</strong> Handles HTTP requests, input formatting, authentication checks, and renders UI or JSON responses.
+              </div>
+            </div>
+            <ul class="check-list mt-4">
+              <li>Separation of concerns &amp; clean code structure</li>
+              <li>Better maintainability &amp; isolated unit testability</li>
+              <li>Encourages reusability across enterprise apps</li>
+            </ul>
+          </div>
+
+          <!-- Monolithic Architecture -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">2. Monolithic Architecture</h2>
+              <span class="badge badge-purple">Single Deployment Unit</span>
+            </div>
+            <p style="font-size:0.88rem; color:var(--text-secondary); margin-bottom:14px;">
+              A single, unified application where UI, business logic, and data access are packaged, built, and deployed together against a single database.
+            </p>
+            <div class="blueprint-box mb-4">
+              <div style="border:2px dashed var(--accent-secondary); border-radius:12px; padding:14px; text-align:center; background:var(--bg-surface);">
+                <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--accent-secondary); font-weight:700; margin-bottom:8px;">SINGLE DEPLOYABLE ARTIFACT (.JAR / .WAR / CONTAINER)</div>
+                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
+                  <div class="arch-node" style="min-width:0; padding:8px;"><div class="node-title">UI</div></div>
+                  <div class="arch-node" style="min-width:0; padding:8px;"><div class="node-title">Logic</div></div>
+                  <div class="arch-node" style="min-width:0; padding:8px;"><div class="node-title">DAL</div></div>
+                </div>
+              </div>
+              <div style="text-align:center; margin:8px 0; font-weight:700; color:var(--text-muted);">↕ Single Connection Pool</div>
+              <div class="arch-node" style="max-width:240px; margin:0 auto;">
+                <div class="node-title">Single Shared Database</div>
+                <div class="node-sub">MySQL / Postgres / MongoDB</div>
+              </div>
+            </div>
+            <div class="grid-2">
+              <div>
+                <strong style="font-size:0.84rem; color:var(--success);">Advantages</strong>
+                <ul class="check-list mt-4">
+                  <li>Simple to develop, test &amp; deploy</li>
+                  <li>Lower operational complexity</li>
+                  <li>Faster initial MVP delivery</li>
+                </ul>
+              </div>
+              <div>
+                <strong style="font-size:0.84rem; color:var(--warning);">Limitations</strong>
+                <ul class="check-list cross-list mt-4">
+                  <li>Harder to scale individual modules</li>
+                  <li>Tightly coupled codebase</li>
+                  <li>Full app redeploy on small change</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="interview-callout">
+          <strong>★ Interview Point</strong>
+          Monolith is a <em>deployment model</em> (simpler, great for startups/MVPs, less independently scalable), whereas Layered Architecture is a <em>code organization pattern</em> that can be used inside both a Monolith and individual Microservices.
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           SECTION 03: MICROSERVICES ARCHITECTURE (Page 3)
+           ==================================================================== -->
+      <section id="sec-microservices" class="section-panel">
+        <div class="section-hero">
+          <span class="section-tag">Page 3 // Distributed Service Decomposition</span>
+          <h1 class="section-title">Microservices Architecture &amp; API Gateway</h1>
+          <p class="section-desc">
+            Building applications as a suite of small, autonomous, loosely coupled services modeled around business domains—each owning its own database.
+          </p>
+        </div>
+
+        <!-- Interactive API Gateway & Microservices Simulator -->
+        <div class="card mb-6">
+          <div class="card-header">
+            <h2 class="card-title">⚡ Interactive Request Routing Simulator</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-sm btn-primary" onclick="simulateMicroservice('user')">Web → GET /users/42</button>
+              <button class="btn btn-sm btn-primary" onclick="simulateMicroservice('order')">Mobile → POST /orders</button>
+              <button class="btn btn-sm btn-primary" onclick="simulateMicroservice('payment')">Client → POST /payments</button>
+            </div>
+          </div>
+          <div class="blueprint-box">
+            <div class="node-row mb-4">
+              <div class="arch-node" id="ms-client-web"><div class="node-title">💻 Web App</div></div>
+              <div class="arch-node" id="ms-client-mob"><div class="node-title">📱 Mobile App</div></div>
+              <div class="arch-node" id="ms-client-ext"><div class="node-title">🌐 External Client</div></div>
+            </div>
+            <div style="text-align:center; color:var(--accent); font-weight:700; margin-bottom:10px;">↓ HTTPS Requests ↓</div>
+            <div class="arch-node" id="ms-gateway" style="max-width:540px; margin:0 auto 14px;">
+              <div class="node-title">🛡️ API Gateway (Single Entry Point)</div>
+              <div class="node-sub">Routing • JWT Auth • Rate Limiting • Load Balancing</div>
+            </div>
+            <div class="grid-3">
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div class="arch-node" id="ms-svc-user"><div class="node-title">User Service</div><div class="node-sub">Profiles &amp; Auth</div></div>
+                <div style="text-align:center; color:var(--text-muted);">↓</div>
+                <div class="arch-node" id="ms-db-user"><div class="node-title">🗄️ User DB</div><div class="node-sub">PostgreSQL</div></div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div class="arch-node" id="ms-svc-order"><div class="node-title">Order Service</div><div class="node-sub">Cart &amp; Checkout</div></div>
+                <div style="text-align:center; color:var(--text-muted);">↓</div>
+                <div class="arch-node" id="ms-db-order"><div class="node-title">🗄️ Order DB</div><div class="node-sub">MySQL</div></div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div class="arch-node" id="ms-svc-payment"><div class="node-title">Payment Service</div><div class="node-sub">Billing &amp; Ledger</div></div>
+                <div style="text-align:center; color:var(--text-muted);">↓</div>
+                <div class="arch-node" id="ms-db-payment"><div class="node-title">🗄️ Payment DB</div><div class="node-sub">Transactional DB</div></div>
+              </div>
+            </div>
+            <div class="sim-log" id="msSimLog">Click a client request button above to trace API Gateway authentication, routing, and isolated DB access.</div>
+          </div>
+        </div>
+
+        <div class="grid-2 mb-4">
+          <div class="card">
+            <h3 class="card-title mb-4">Key Characteristics &amp; Advantages</h3>
+            <ul class="check-list">
+              <li><strong>Domain Decomposition:</strong> Organized around business capabilities.</li>
+              <li><strong>Database per Service:</strong> Strict data ownership; no shared DB coupling.</li>
+              <li><strong>Independent Scaling:</strong> Scale hot services (e.g., Order) independently.</li>
+              <li><strong>Fault Isolation:</strong> Failure in one service won't crash the entire platform.</li>
+              <li><strong>Polyglot Stack:</strong> Use the best language/DB per service.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3 class="card-title mb-4">Challenges &amp; Real-World Adopters</h3>
+            <ul class="check-list cross-list mb-4">
+              <li>Distributed system complexity (tracing, logging, service mesh).</li>
+              <li>Network latency &amp; eventual data consistency across services.</li>
+              <li>Higher infrastructure &amp; DevOps automation cost.</li>
+            </ul>
+            <div>
+              <span class="badge badge-blue">Netflix</span>
+              <span class="badge badge-blue">Uber</span>
+              <span class="badge badge-blue">Amazon</span>
+              <span class="badge badge-blue">Swiggy / Zomato</span>
+              <span class="badge badge-blue">Nykaa</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title mb-4">Monolith vs. Microservices Comparison</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Aspect</th><th>Monolithic</th><th>Microservices</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Structure</strong></td><td>Single, unified application</td><td>Multiple, independent services</td></tr>
+                <tr><td><strong>Deployment</strong></td><td>Deploy entire app as a whole</td><td>Independent deployment per service</td></tr>
+                <tr><td><strong>Scalability</strong></td><td>Limited (must scale entire app)</td><td>High (scale specific bottleneck service)</td></tr>
+                <tr><td><strong>Fault Isolation</strong></td><td>Low (memory leak/crash affects all)</td><td>High (isolated to single service)</td></tr>
+                <tr><td><strong>Complexity</strong></td><td>Lower operational overhead</td><td>Higher (distributed tracing, orchestration)</td></tr>
+                <tr><td><strong>Best Use Case</strong></td><td>Small/medium apps, early startups</td><td>Large, complex, multi-team evolving systems</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           SECTION 04: EVENT-DRIVEN ARCHITECTURE (Page 4)
+           ==================================================================== -->
+      <section id="sec-event-driven" class="section-panel">
+        <div class="section-hero">
+          <span class="section-tag">Page 4 // Asynchronous Decoupling</span>
+          <h1 class="section-title">Event-Driven Architecture (EDA)</h1>
+          <p class="section-desc">
+            Components communicate asynchronously by emitting and reacting to immutable domain events (e.g., <code>OrderPlaced</code>) rather than synchronous RPC calls.
+          </p>
+        </div>
+
+        <div class="card mb-6">
+          <div class="card-header">
+            <h2 class="card-title">📡 Live Event Flow Simulator (OrderPlaced)</h2>
+            <button class="btn btn-sm btn-primary" onclick="triggerEventFlow()">▶ Emit "OrderPlaced" Event</button>
+          </div>
+          <div class="blueprint-box">
+            <div class="node-row">
+              <div class="arch-node" id="eda-producer">
+                <div class="node-title">Order Service</div>
+                <div class="node-sub">Event Producer</div>
+              </div>
+              <div class="arrow-connector">→ Publish →</div>
+              <div class="arch-node" id="eda-broker">
+                <div class="node-title">Event Broker</div>
+                <div class="node-sub">Apache Kafka / RabbitMQ</div>
+              </div>
+              <div class="arrow-connector">→ Fan-Out →</div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div class="arch-node" id="eda-c1"><div class="node-title">Payment Service</div><div class="node-sub">Process Charge</div></div>
+                <div class="arch-node" id="eda-c2"><div class="node-title">Notification Service</div><div class="node-sub">Send Email / SMS</div></div>
+                <div class="arch-node" id="eda-c3"><div class="node-title">Analytics Service</div><div class="node-sub">Update Real-time Metrics</div></div>
+              </div>
+            </div>
+            <div class="sim-log" id="edaSimLog">Click "Emit OrderPlaced Event" to watch decoupled asynchronous fan-out across consumers.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Event Choreography vs. Event Orchestration</h3>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Aspect</th><th>Choreography</th><th>Orchestration</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Control</strong></td><td>Decentralized (services independently react to events)</td><td>Centralized (a workflow controller directs each step)</td></tr>
+                <tr><td><strong>Coupling</strong></td><td>Very Low (producers don't know consumers)</td><td>Higher (orchestrator knows all participants)</td></tr>
+                <tr><td><strong>Complexity</strong></td><td>Simple &amp; scalable for small flows; hard to trace in huge chains</td><td>Easier to manage, monitor, and debug complex workflows</td></tr>
+                <tr><td><strong>Example</strong></td><td>Order → Payment → Notification (via pub/sub events)</td><td>A central Workflow Engine triggers Order → Payment → Ship</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="interview-callout">
+            <strong>★ Interview Point</strong>
+            Event-driven architecture improves scalability and resilience by decoupling services using events, making it effortless to plug in new consumers (like Audit or Fraud Detection) without touching the Order Service.
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           SECTION 05: MESSAGE QUEUE & PUB/SUB PATTERNS (Page 5)
+           ==================================================================== -->
+      <section id="sec-messaging" class="section-panel">
+        <div class="section-hero">
+          <span class="section-tag">Page 5 // Asynchronous Messaging &amp; Brokers</span>
+          <h1 class="section-title">Message Queue &amp; Pub/Sub Patterns</h1>
+          <p class="section-desc">
+            Buffering traffic spikes, distributing background tasks, and streaming real-time events using durable message brokers.
+          </p>
+        </div>
+
+        <!-- Interactive Toggle: Point-to-Point vs Pub/Sub -->
+        <div class="card mb-6">
+          <div class="card-header">
+            <h2 class="card-title">📬 Messaging Topology &amp; Kafka Consumer Group Simulator</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-sm active-pill" id="btnModeP2P" onclick="setMsgMode('p2p')">Point-to-Point (Queue)</button>
+              <button class="btn btn-sm" id="btnModePubSub" onclick="setMsgMode('pubsub')">Publish / Subscribe (Topic)</button>
+              <button class="btn btn-sm btn-primary" onclick="sendBrokerMessage()">✉ Send Message</button>
+            </div>
+          </div>
+          <div class="blueprint-box" id="msgTopologyCanvas"></div>
+        </div>
+
+        <!-- Delivery Guarantees & Kafka vs RabbitMQ -->
+        <div class="grid-2">
+          <div class="card">
+            <h3 class="card-title mb-4">🎯 Message Delivery Guarantees</h3>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <div class="stat-box" style="text-align:left;">
+                <span class="badge badge-amber">At Most Once</span>
+                <p style="font-size:0.84rem; color:var(--text-secondary); margin-top:6px;">Fire-and-forget. Messages may be lost on failure, never duplicated. Used for best-effort metrics/logs.</p>
+              </div>
+              <div class="stat-box" style="text-align:left;">
+                <span class="badge badge-blue">At Least Once (Most Common)</span>
+                <p style="font-size:0.84rem; color:var(--text-secondary); margin-top:6px;">Guaranteed delivery via retries &amp; ACKs, but duplicates can occur. Requires idempotent consumers.</p>
+              </div>
+              <div class="stat-box" style="text-align:left;">
+                <span class="badge badge-green">Exactly Once</span>
+                <p style="font-size:0.84rem; color:var(--text-secondary); margin-top:6px;">Each message processed strictly once. Hardest to achieve; requires transactional outbox + idempotency.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 class="card-title mb-4">⚔️ Apache Kafka vs. RabbitMQ</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Aspect</th><th>Apache Kafka</th><th>RabbitMQ</th></tr></thead>
+                <tbody>
+                  <tr><td><strong>Type</strong></td><td>Distributed event streaming log</td><td>Traditional message broker (AMQP)</td></tr>
+                  <tr><td><strong>Throughput</strong></td><td>Very High (millions msgs/sec)</td><td>Moderate (tens of thousands/sec)</td></tr>
+                  <tr><td><strong>Persistence</strong></td><td>High (immutable log retention)</td><td>Removed once ACKed by consumer</td></tr>
+                  <tr><td><strong>Consumer Groups</strong></td><td>Partition-based parallel scaling</td><td>Competing consumers on queue</td></tr>
+                  <tr><td><strong>Best For</strong></td><td>Event streaming, replay, real-time analytics</td><td>Task queues, job processing, complex routing</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           SECTION 06: CQRS & EVENT SOURCING (Page 6)
+           ==================================================================== -->
+      <section id="sec-cqrs" class="section-panel">
+        <div class="section-hero">
+          <span class="section-tag">Page 6 // Read/Write Segregation &amp; Immutable Logs</span>
+          <h1 class="section-title">CQRS &amp; Event Sourcing</h1>
+          <p class="section-desc">
+            Separating write commands from read queries (CQRS) and storing every state mutation as an append-only sequence of domain events (Event Sourcing).
+          </p>
+        </div>
+
+        <!-- Interactive Banking CQRS + Event Sourcing Simulator -->
+        <div class="card mb-6">
+          <div class="card-header">
+            <h2 class="card-title">🏦 Live CQRS + Event Sourcing Simulator (Banking Ledger)</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-sm btn-primary" onclick="executeTransferCommand()">💸 Command: Transfer ₹1,000 (A → B)</button>
+              <button class="btn btn-sm" onclick="replayEventStore()">🔄 Replay Event Store</button>
+            </div>
+          </div>
+          <div class="blueprint-box">
+            <div class="grid-3 mb-4">
+              <div class="arch-node" id="cqrs-cmd">
+                <div class="node-title">Command Service (Write)</div>
+                <div class="node-sub">Validates balance &amp; emits events</div>
+              </div>
+              <div class="arch-node" id="cqrs-store">
+                <div class="node-title">Event Store (Append-Only)</div>
+                <div class="node-sub" id="eventCountLabel">2 Initial Events Stored</div>
+              </div>
+              <div class="arch-node" id="cqrs-read">
+                <div class="node-title">Projection → Query Read DB</div>
+                <div class="node-sub" id="cqrsBalances">Account A: ₹5,000 | Account B: ₹2,000</div>
+              </div>
+            </div>
+            <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:8px; padding:10px; max-height:140px; overflow-y:auto; font-family:var(--font-mono); font-size:0.78rem;" id="eventLogStream">
+              <div>#1 [AccountInitialized] Account A = ₹5,000</div>
+              <div>#2 [AccountInitialized] Account B = ₹2,000</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3 class="card-title mb-4">Benefits of CQRS + Event Sourcing</h3>
+            <ul class="check-list">
+              <li><strong>Independent Scaling:</strong> Scale read replicas independently from write nodes.</li>
+              <li><strong>Complete Audit Trail:</strong> Every historical state change is preserved forever.</li>
+              <li><strong>Time-Travel &amp; Replay:</strong> Rebuild corrupted read views or spin up new analytics projections by replaying events.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3 class="card-title mb-4">Trade-offs &amp; Ideal Use Cases</h3>
+            <ul class="check-list cross-list mb-4">
+              <li>Eventual consistency between Write Model and Read Projection.</li>
+              <li>Higher architectural complexity; overkill for simple CRUD apps.</li>
+            </ul>
+            <div>
+              <span class="badge badge-green">Banking &amp; Payments</span>
+              <span class="badge badge-green">E-Commerce Orders</span>
+              <span class="badge badge-green">Flight/Hotel Bookings</span>
+              <span class="badge badge-green">Version History</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           SECTION 07: DATABASE ARCHITECTURE PATTERNS (Page 7)
+           ==================================================================== -->
+      <section id="sec-database" class="section-panel">
+        <div class="section-hero">
+          <span class="section-tag">Page 7 // Data Scaling, Sharding &amp; Replication</span>
+          <h1 class="section-title">Database Architecture Patterns</h1>
+          <p class="section-desc">
+            Techniques for distributing, replicating, and partitioning massive datasets for high availability and horizontal throughput.
+          </p>
+        </div>
+
+        <div class="grid-2 mb-6">
+          <!-- Interactive Database Sharding Simulator -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">🧩 Interactive Sharding Router</h2>
+              <span class="badge badge-blue">Horizontal Scaling</span>
+            </div>
+            <p style="font-size:0.86rem; color:var(--text-secondary); margin-bottom:12px;">
+              Splits data across multiple independent DB instances using a <strong>Shard Key</strong>. Enter a username below to test routing:
+            </p>
+            <div style="display:flex; gap:8px; margin-bottom:14px;">
+              <input type="text" id="shardUserInput" class="input-field" style="flex:1;" placeholder="Enter username (e.g. Alice, Kiran, Zara)" value="Kiran" oninput="routeShard()" />
+              <button class="btn btn-sm btn-primary" onclick="routeShard()">Route Key</button>
+            </div>
+            <div class="blueprint-box">
+              <div class="arch-node highlight mb-4" style="max-width:240px; margin:0 auto 12px;">
+                <div class="node-title">Shard Router</div>
+                <div class="node-sub" id="shardRouterSub">Key: "Kiran" → Starts with K</div>
+              </div>
+              <div class="grid-3">
+                <div class="arch-node" id="shard-1"><div class="node-title">Shard 1</div><div class="node-sub">Users A – H</div></div>
+                <div class="arch-node highlight" id="shard-2"><div class="node-title">Shard 2</div><div class="node-sub">Users I – P</div></div>
+                <div class="arch-node" id="shard-3"><div class="node-title">Shard 3</div><div class="node-sub">Users Q – Z</div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Replication & Leader-Follower Simulator -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">🔁 Leader-Follower Replication</h2>
+              <div style="display:flex; gap:6px;">
+                <button class="btn btn-sm btn-primary" onclick="simDbQuery('write')">Write Query</button>
+                <button class="btn btn-sm" onclick="simDbQuery('read')">Read Query</button>
+              </div>
+            </div>
+            <p style="font-size:0.86rem; color:var(--text-secondary); margin-bottom:12px;">
+              <strong>Leader (Primary)</strong> handles all writes and replicates changes to <strong>Followers (Read Replicas)</strong> to scale read traffic and ensure failover.
+            </p>
+            <div class="blueprint-box">
+              <div class="arch-node" id="db-leader" style="max-width:240px; margin:0 auto 12px;">
+                <div class="node-title">👑 Leader (Primary DB)</div>
+                <div class="node-sub">Handles Writes + Async Sync</div>
+              </div>
+              <div style="text-align:center; color:var(--text-muted); font-size:0.8rem; margin-bottom:10px;">↙ Replication Stream ↘</div>
+              <div class="grid-2">
+                <div class="arch-node" id="db-rep1"><div class="node-title">Follower 1</div><div class="node-sub">Read Replica</div></div>
+                <div class="arch-node" id="db-rep2"><div class="node-title">Follower 2</div><div class="node-sub">Read Replica</div></div>
+              </div>
+              <div class="sim-log" id="dbRepLog">Click Write Query or Read Query to observe traffic routing.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Partitioning & SQL vs NoSQL -->
+        <div class="grid-2">
+          <div class="card">
+            <h3 class="card-title mb-4">🗂️ Table Partitioning (Single DB Instance)</h3>
+            <p style="font-size:0.86rem; color:var(--text-secondary); margin-bottom:12px;">
+              Divides a large table (e.g., <code>Orders</code>) into smaller manageable physical parts within the same database for faster queries and easy archival:
+            </p>
+            <ul class="check-list">
+              <li><strong>Range Partitioning:</strong> By date intervals (P1: Jan–Mar, P2: Apr–Jun, P3: Jul–Sep).</li>
+              <li><strong>Hash Partitioning:</strong> By hash of <code>userId</code> for uniform distribution.</li>
+              <li><strong>List Partitioning:</strong> By discrete values like Region (US, EU, APAC).</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3 class="card-title mb-4">⚖️ SQL (RDBMS) vs. NoSQL (Non-RDBMS)</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Aspect</th><th>SQL (Postgres, MySQL)</th><th>NoSQL (Cassandra, DynamoDB)</th></tr></thead>
+                <tbody>
+                  <tr><td><strong>Data Model</strong></td><td>Relational Tables &amp; Joins</td><td>Document, Key-Value, Wide-Column</td></tr>
+                  <tr><td><strong>Schema</strong></td><td>Fixed, strict schema</td><td>Flexible, schema-less</td></tr>
+                  <tr><td><strong>Consistency</strong></td><td>Strong (ACID transactions)</td><td>Eventual / Tunable consistency</td></tr>
+                  <tr><td><strong>Scalability</strong></td><td>Vertical + limited horizontal</td><td>Massive horizontal scalability</td></tr>
+                  <tr><td><strong>Best For</strong></td><td>Banking, ERP, complex joins</td><td>High-throughput feeds, IoT, catalogs</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           SECTION 08: CACHING ARCHITECTURE PATTERNS (Page 8)
+           ==================================================================== -->
+      <section id="sec-caching" class="section-panel">
+        <div class="section-hero">
+          <span class="section-tag">Page 8 // In-Memory Acceleration &amp; Invalidation</span>
+          <h1 class="section-title">Caching Architecture Patterns</h1>
+          <p class="section-desc">
+            Storing hot data in ultra-fast in-memory stores (Redis, Memcached, CDN) to slash read latency and protect primary databases from load spikes.
+          </p>
+        </div>
+
+        <!-- Interactive 4-Pattern Caching Simulator -->
+        <div class="card mb-6">
+          <div class="card-header">
+            <h2 class="card-title">⚡ Interactive Caching Strategy Simulator</h2>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button class="btn btn-sm active-pill" id="cacheBtn-aside" onclick="selectCachePattern('aside')">(a) Cache-Aside</button>
+              <button class="btn btn-sm" id="cacheBtn-through" onclick="selectCachePattern('through')">(b) Write-Through</button>
+              <button class="btn btn-sm" id="cacheBtn-back" onclick="selectCachePattern('back')">(c) Write-Back</button>
+              <button class="btn btn-sm" id="cacheBtn-around" onclick="selectCachePattern('around')">(d) Write-Around</button>
+            </div>
+          </div>
+          <div class="blueprint-box" id="cachePatternCanvas"></div>
+        </div>
+
+        <!-- Cache Invalidation Strategies -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">🧹 5 Cache Invalidation &amp; Population Strategies</h3>
+            <span class="badge badge-amber">Preventing Stale Data</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Strategy</th><th>How It Works</th><th>Best For</th></tr></thead>
+              <tbody>
+                <tr><td><strong>TTL (Time-To-Live)</strong></td><td>Auto-expire cached keys after a fixed duration (e.g., 5 mins, 1 hr).</td><td>Product catalogs, public API responses</td></tr>
+                <tr><td><strong>Explicit Invalidation</strong></td><td>Application explicitly deletes or updates cache key on DB write.</td><td>User profiles, settings updates</td></tr>
+                <tr><td><strong>Event-Based</strong></td><td>Invalidate cache asynchronously via CDC or Kafka events (e.g., <code>OrderUpdated</code>).</td><td>Microservices architectures</td></tr>
+                <tr><td><strong>Versioning</strong></td><td>Append version to key (e.g., <code>user:123:v2</code>) to bypass stale entries safely.</td><td>Zero-downtime schema/config rollouts</td></tr>
+                <tr><td><strong>Cache Warming</strong></td><td>Pre-load hot data into Redis at startup or prior to flash sales.</td><td>Black Friday traffic, home timelines</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           SECTION 09: SCALABILITY & TRAFFIC MANAGEMENT (Page 9)
+           ==================================================================== -->
+      <section id="sec-scalability" class="section-panel">
+        <div class="section-hero">
+          <span class="section-tag">Page 9 // Load Balancing, Rate Limiting &amp; Resilience</span>
+          <h1 class="section-title">Scalability &amp; Traffic Management</h1>
+          <p class="section-desc">
+            Handling traffic growth, distributing load across server fleets, and protecting services from cascading overload.
+          </p>
+        </div>
+
+        <div class="grid-2 mb-6">
+          <!-- Interactive Load Balancer Simulator -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">⚖️ Load Balancer Simulator</h2>
+              <select id="lbAlgoSelect" class="input-field" style="padding:4px 8px; font-size:0.8rem;">
+                <option value="rr">Round Robin</option>
+                <option value="lc">Least Connections</option>
+                <option value="weighted">Weighted (Server 1 = 2x)</option>
+              </select>
+            </div>
+            <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:10px;">
+              L4 (TCP/UDP IP+Port) vs L7 (HTTP Headers/URL Path). Dispatch requests below:
+            </p>
+            <div style="margin-bottom:12px;">
+              <button class="btn btn-sm btn-primary" onclick="dispatchLBRequest()">📨 Send Incoming Request</button>
+              <button class="btn btn-sm" onclick="resetLB()">Reset Counts</button>
+            </div>
+            <div class="blueprint-box">
+              <div class="arch-node highlight mb-4" style="max-width:220px; margin:0 auto 12px;">
+                <div class="node-title">Load Balancer (NGINX / ALB)</div>
+              </div>
+              <div class="grid-3">
+                <div class="arch-node" id="lb-s1"><div class="node-title">Server 1</div><div class="node-sub" id="lb-c1">Reqs: 0</div></div>
+                <div class="arch-node" id="lb-s2"><div class="node-title">Server 2</div><div class="node-sub" id="lb-c2">Reqs: 0</div></div>
+                <div class="arch-node" id="lb-s3"><div class="node-title">Server 3</div><div class="node-sub" id="lb-c3">Reqs: 0</div></div>
+              </div>
+              <div class="sim-log" id="lbSimLog">Ready to route incoming client traffic.</div>
+            </div>
+          </div>
+
+          <!-- Interactive Circuit Breaker State Machine -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">🔌 Circuit Breaker State Machine</h2>
+              <span class="badge badge-green" id="cbBadgeState">STATE: CLOSED</span>
+            </div>
+            <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:10px;">
+              Prevents cascading failures by failing fast when a downstream dependency crosses a failure threshold (3 failures → Open).
+            </p>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;">
+              <button class="btn btn-sm btn-primary" onclick="cbCall(true)">✅ Successful Call</button>
+              <button class="btn btn-sm" style="border-color:var(--danger); color:var(--danger);" onclick="cbCall(false)">💥 Failing Call</button>
+              <button class="btn btn-sm" onclick="cbTimeoutRecover()">⏱ Cooldown Timer (Half-Open)</button>
+            </div>
+            <div class="blueprint-box">
+              <div class="node-row">
+                <div class="arch-node success-node" id="cb-closed">
+                  <div class="node-title">CLOSED</div>
+                  <div class="node-sub">Normal traffic</div>
+                </div>
+                <div class="arrow-connector">→</div>
+                <div class="arch-node" id="cb-open">
+                  <div class="node-title">OPEN</div>
+                  <div class="node-sub">Fail fast (block)</div>
+                </div>
+                <div class="arrow-connector">→</div>
+                <div class="arch-node" id="cb-half">
+                  <div class="node-title">HALF-OPEN</div>
+                  <div class="node-sub">Probe recovery</div>
+                </div>
+              </div>
+              <div class="sim-log" id="cbSimLog">Failures: 0 / 3. Circuit is CLOSED and passing requests normally.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scaling, Rate Limiting, Bulkhead & Traffic Table -->
+        <div class="grid-3 mb-4">
+          <div class="card">
+            <h3 class="card-title mb-4">📈 Vertical vs. Horizontal</h3>
+            <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:8px;"><strong>Vertical (Scale Up):</strong> Upgrade single box (4GB → 64GB RAM). Simple, but hits hardware ceiling.</p>
+            <p style="font-size:0.85rem; color:var(--text-secondary);"><strong>Horizontal (Scale Out):</strong> Add more stateless instances behind a Load Balancer. Infinitely scalable &amp; fault tolerant.</p>
+          </div>
+          <div class="card">
+            <h3 class="card-title mb-4">🚦 Rate Limiting Algorithms</h3>
+            <ul class="check-list">
+              <li><strong>Fixed Window:</strong> e.g., 100 req/min counter.</li>
+              <li><strong>Sliding Window:</strong> Smooth rolling timestamp check.</li>
+              <li><strong>Token Bucket:</strong> Allows controlled traffic bursts.</li>
+              <li><strong>Leaky Bucket:</strong> Smooths output to fixed rate.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3 class="card-title mb-4">🚢 Bulkhead Pattern</h3>
+            <p style="font-size:0.85rem; color:var(--text-secondary);">
+              Inspired by ship compartments: isolates thread pools &amp; connection pools per downstream dependency (Module A, B, C) so one slow service cannot exhaust all threads.
+            </p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title mb-4">Additional Traffic Control Patterns</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Pattern</th><th>Purpose</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Throttling</strong></td><td>Intentionally slow down request processing rate rather than outright rejecting.</td></tr>
+                <tr><td><strong>Backpressure</strong></td><td>Signal upstream producers to slow down emission when consumer buffers fill up.</td></tr>
+                <tr><td><strong>Queueing</strong></td><td>Buffer burst traffic asynchronously in a queue for steady background worker processing.</td></tr>
+                <tr><td><strong>Autoscaling</strong></td><td>Dynamically add/remove compute instances based on CPU, memory, or RPS metrics.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           SECTION 10: DISTRIBUTED SYSTEMS PATTERNS (Page 10)
+           ==================================================================== -->
+      <section id="sec-distributed" class="section-panel">
+        <div class="section-hero">
+          <span class="section-tag">Page 10 // Distributed Transactions, Migrations &amp; Retries</span>
+          <h1 class="section-title">Distributed Systems Patterns</h1>
+          <p class="section-desc">
+            Maintaining data consistency across microservices without distributed 2PC locks, safely migrating legacy monoliths, and handling transient network faults.
+          </p>
+        </div>
+
+        <div class="grid-2 mb-6">
+          <!-- Interactive Saga Pattern Simulator -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">🔄 Saga Pattern Simulator</h2>
+              <span class="badge badge-purple">Compensating Rollbacks</span>
+            </div>
+            <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:10px;">
+              Breaks a distributed transaction into local transactions. If any step fails, compensating actions undo prior steps:
+            </p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+              <button class="btn btn-sm btn-primary" onclick="runSaga(false)">▶ Run Happy Path Saga</button>
+              <button class="btn btn-sm" style="border-color:var(--danger); color:var(--danger);" onclick="runSaga(true)">💥 Simulate Inventory Failure</button>
+            </div>
+            <div class="blueprint-box">
+              <div class="node-row">
+                <div class="arch-node" id="saga-order"><div class="node-title">1. Order Service</div><div class="node-sub" id="saga-order-sub">Create Order</div></div>
+                <div class="arrow-connector">→</div>
+                <div class="arch-node" id="saga-pay"><div class="node-title">2. Payment Service</div><div class="node-sub" id="saga-pay-sub">Charge Card</div></div>
+                <div class="arrow-connector">→</div>
+                <div class="arch-node" id="saga-inv"><div class="node-title">3. Inventory Service</div><div class="node-sub" id="saga-inv-sub">Reserve Stock</div></div>
+              </div>
+              <div class="sim-log" id="sagaSimLog">Run Happy Path or Simulate Failure to see forward &amp; compensating transactions.</div>
+            </div>
+          </div>
+
+          <!-- Interactive Strangler Fig Migration Slider -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">🌿 Strangler Fig Migration</h2>
+              <span class="badge badge-green" id="stranglerPctBadge">20% Migrated</span>
+            </div>
+            <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:10px;">
+              Incrementally route traffic via Proxy/API Gateway from a Legacy Monolith to new Microservices with zero downtime:
+            </p>
+            <div class="input-group mb-4">
+              <label>Traffic Shift Slider (0% Legacy → 100% New Microservice)</label>
+              <input type="range" min="0" max="100" value="20" oninput="updateStrangler(this.value)" />
+            </div>
+            <div class="blueprint-box">
+              <div class="node-row">
+                <div class="arch-node"><div class="node-title">Proxy / Gateway</div></div>
+                <div class="arrow-connector">➔</div>
+                <div style="display:flex; flex-direction:column; gap:8px; flex:1;">
+                  <div class="arch-node success-node">
+                    <div class="node-title">New Service: <span id="stranglerNewVal">20%</span></div>
+                    <div class="node-sub">Incremental Modern Stack</div>
+                  </div>
+                  <div class="arch-node warn-node">
+                    <div class="node-title">Legacy Monolith: <span id="stranglerOldVal">80%</span></div>
+                    <div class="node-sub">Gradually Decommissioned</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Retry, Idempotency, Timeout, Fallback -->
+        <div class="grid-2">
+          <div class="card">
+            <h3 class="card-title mb-4">🔁 Retry Pattern (Exponential Backoff)</h3>
+            <p style="font-size:0.86rem; color:var(--text-secondary); margin-bottom:10px;">
+              Automatically re-attempt transient failures (5xx, network timeouts) with increasing delays + jitter and a strict max retry cap:
+            </p>
+            <div class="node-row" style="justify-content:flex-start;">
+              <span class="badge badge-blue">Attempt 1 (0s)</span> →
+              <span class="badge badge-blue">Retry 1 (1s)</span> →
+              <span class="badge badge-amber">Retry 2 (2s)</span> →
+              <span class="badge badge-amber">Retry 3 (4s)</span> →
+              <span class="badge badge-red">Max Cap (8s)</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 class="card-title mb-4">🔑 Idempotency, Timeout &amp; Fallback</h3>
+            <ul class="check-list">
+              <li><strong>Idempotency-Key:</strong> Client sends unique UUID (e.g., <code>Idempotency-Key: abc123</code>). Retries return the cached result instead of charging twice.</li>
+              <li><strong>Timeout:</strong> Bound wait duration on remote calls to prevent thread starvation.</li>
+              <li><strong>Fallback:</strong> Serve graceful degraded response (cached catalog, default recommendations) when primary call fails.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           SECTION 11: RELIABILITY & FAULT TOLERANCE PATTERNS (Page 11)
+           ==================================================================== -->
+      <section id="sec-reliability" class="section-panel">
+        <div class="section-hero">
+          <span class="section-tag">Page 11 // High Availability, DR &amp; Observability</span>
+          <h1 class="section-title">Reliability &amp; Fault Tolerance Patterns</h1>
+          <p class="section-desc">
+            Eliminating Single Points of Failure (SPOF), surviving regional outages, and achieving 99.99% availability in production.
+          </p>
+        </div>
+
+        <!-- Core Definitions Table -->
+        <div class="card mb-6">
+          <h3 class="card-title mb-4">Reliability vs. Availability vs. Fault Tolerance</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Term</th><th>Definition</th><th>Real-World Benchmark</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Reliability</strong></td><td>System performs its intended function accurately and consistently over time without data corruption.</td><td>99.99% successful transaction integrity</td></tr>
+                <tr><td><strong>Availability</strong></td><td>Percentage of time the system is operational and accessible when requested.</td><td>99.99% uptime (~52 mins downtime/year)</td></tr>
+                <tr><td><strong>Fault Tolerance</strong></td><td>System continues operating seamlessly even when underlying servers or zones crash.</td><td>Zero user impact when 1 AZ goes offline</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Interactive Multi-Region Deployment & DR Failover Simulator -->
+        <div class="card mb-6">
+          <div class="card-header">
+            <h2 class="card-title">🌍 Multi-Region Deployment &amp; Failover Simulator</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-sm active-pill" id="drBtnAA" onclick="setDRMode('active-active')">Active-Active</button>
+              <button class="btn btn-sm" id="drBtnAP" onclick="setDRMode('active-passive')">Active-Passive</button>
+              <button class="btn btn-sm" style="border-color:var(--danger); color:var(--danger);" onclick="toggleRegionOutage()">⚡ Toggle Region A Outage</button>
+            </div>
+          </div>
+          <div class="blueprint-box" id="drCanvas"></div>
+        </div>
+
+        <!-- RPO/RTO & Observability -->
+        <div class="grid-2">
+          <div class="card">
+            <h3 class="card-title mb-4">⏱️ Disaster Recovery Metrics (RPO &amp; RTO)</h3>
+            <ul class="check-list">
+              <li><strong>RPO (Recovery Point Objective):</strong> Maximum acceptable amount of data loss measured in time (e.g., <code>RPO = 5 mins</code> means backups/replication happen at least every 5 mins).</li>
+              <li><strong>RTO (Recovery Time Objective):</strong> Maximum acceptable downtime to restore service after an outage (e.g., <code>RTO = 30 mins</code>).</li>
+              <li><strong>Strategies:</strong> Periodic S3 snapshots, cross-region replication, automated DNS failover.</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3 class="card-title mb-4">🔭 Three Pillars of Observability</h3>
+            <div class="grid-3">
+              <div class="stat-box">
+                <div class="node-title">📊 Metrics</div>
+                <div class="node-sub mt-4">CPU, RPS, p99 Latency (Prometheus / Grafana)</div>
+              </div>
+              <div class="stat-box">
+                <div class="node-title">📜 Logs</div>
+                <div class="node-sub mt-4">Structured error &amp; audit events (ELK Stack)</div>
+              </div>
+              <div class="stat-box">
+                <div class="node-title">🧵 Traces</div>
+                <div class="node-sub mt-4">End-to-end request spans (Jaeger / OpenTelemetry)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           SECTION 12: DATA PROCESSING ARCHITECTURE PATTERNS (Page 12)
+           ==================================================================== -->
+      <section id="sec-data-processing" class="section-panel">
+        <div class="section-hero">
+          <span class="section-tag">Page 12 // Big Data &amp; Real-Time Streaming Pipelines</span>
+          <h1 class="section-title">Data Processing Architecture Patterns</h1>
+          <p class="section-desc">
+            Transforming massive historical datasets and live event streams into actionable analytics using Batch, Stream, Lambda, and Kappa architectures.
+          </p>
+        </div>
+
+        <!-- Interactive Architecture Switcher: Batch vs Stream vs Lambda vs Kappa -->
+        <div class="card mb-6">
+          <div class="card-header">
+            <h2 class="card-title">🌊 Interactive Pipeline Architecture Explorer</h2>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button class="btn btn-sm active-pill" id="dpBtn-batch" onclick="selectDataPattern('batch')">Batch Processing</button>
+              <button class="btn btn-sm" id="dpBtn-stream" onclick="selectDataPattern('stream')">Stream Processing</button>
+              <button class="btn btn-sm" id="dpBtn-lambda" onclick="selectDataPattern('lambda')">Lambda Architecture</button>
+              <button class="btn btn-sm" id="dpBtn-kappa" onclick="selectDataPattern('kappa')">Kappa Architecture</button>
+            </div>
+          </div>
+          <div class="blueprint-box" id="dataPipelineCanvas"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <h3 class="card-title mb-4">Lambda vs. Kappa Comparison</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Aspect</th><th>Lambda Architecture</th><th>Kappa Architecture</th></tr></thead>
+                <tbody>
+                  <tr><td><strong>Pipelines</strong></td><td>Two (Batch Layer + Speed Layer)</td><td>Single unified Stream pipeline</td></tr>
+                  <tr><td><strong>Complexity</strong></td><td>Higher (maintain 2 codebases)</td><td>Lower (1 streaming codebase)</td></tr>
+                  <tr><td><strong>Historical Data</strong></td><td>Processed via scheduled Batch jobs</td><td>Replayed from immutable Kafka log</td></tr>
+                  <tr><td><strong>When to Use</strong></td><td>Strict accuracy + real-time speed</td><td>Simpler unified real-time pipelines</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 class="card-title mb-4">🛠️ Data Engineering Ecosystem</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Layer</th><th>Industry Standard Tools</th></tr></thead>
+                <tbody>
+                  <tr><td><strong>Ingestion</strong></td><td>Apache Kafka, AWS Kinesis, RabbitMQ</td></tr>
+                  <tr><td><strong>Batch Compute</strong></td><td>Apache Spark, Hadoop, Hive</td></tr>
+                  <tr><td><strong>Stream Compute</strong></td><td>Apache Flink, Spark Streaming, Kafka Streams</td></tr>
+                  <tr><td><strong>Serving / DW</strong></td><td>BigQuery, Redshift, Cassandra, Elasticsearch</td></tr>
+                  <tr><td><strong>Orchestration</strong></td><td>Apache Airflow, Dagster, Oozie</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           SECTION 13: REAL-WORLD ARCHITECTURE CASE STUDIES (Page 13)
+           ==================================================================== -->
+      <section id="sec-case-studies" class="section-panel">
+        <div class="section-hero">
+          <span class="section-tag">Page 13 // Production System Design Blueprints</span>
+          <h1 class="section-title">Real-World Architecture Case Studies</h1>
+          <p class="section-desc">
+            Explore how global hyperscale platforms combine microservices, CDNs, caching, geospatial indexing, and event streaming in production.
+          </p>
+        </div>
+
+        <div class="card mb-6">
+          <div class="card-header">
+            <h2 class="card-title">🏢 Select Production System Blueprint</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-sm active-pill" id="csBtn-netflix" onclick="selectCaseStudy('netflix')">🎬 Netflix</button>
+              <button class="btn btn-sm" id="csBtn-uber" onclick="selectCaseStudy('uber')">🚗 Uber</button>
+              <button class="btn btn-sm" id="csBtn-whatsapp" onclick="selectCaseStudy('whatsapp')">💬 WhatsApp</button>
+              <button class="btn btn-sm" id="csBtn-youtube" onclick="selectCaseStudy('youtube')">▶️ YouTube</button>
+              <button class="btn btn-sm" id="csBtn-instagram" onclick="selectCaseStudy('instagram')">📸 Instagram</button>
+            </div>
+          </div>
+
+          <div id="caseStudyContainer"></div>
+        </div>
+
+        <div class="interview-callout">
+          <strong>★ Common Patterns Across All 5 Hyperscale Systems</strong>
+          1) Microservices + API Gateway • 2) Global CDN for static/media delivery • 3) Distributed In-Memory Caching (Redis/Memcached) • 4) Asynchronous Event Streaming (Kafka) • 5) Polyglot Storage (SQL for transactions + NoSQL/Object Storage for massive scale).
+        </div>
+      </section>
+
+      <!-- Bottom Prev/Next Section Controls -->
+      <div class="section-footer-nav">
+        <button class="btn" id="prevSecBtn" onclick="navigateStep(-1)">← Previous Section</button>
+        <button class="btn btn-primary" id="nextSecBtn" onclick="navigateStep(1)">Next Section →</button>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<div class="toast" id="toastMsg">Saved!</div>
+
+<!-- ==========================================================================
+     INTERACTIVE JAVASCRIPT ENGINE (Zero External Libraries)
+     ========================================================================== -->
+<script>
+  /* --------------------------------------------------------------------------
+     1. DATA REPOSITORY: ALL 25 PATTERNS, CHECKLIST & CASE STUDIES
+     -------------------------------------------------------------------------- */
+  const PATTERNS_25 = [
+    { id: 1, name: "API Gateway", cat: "Traffic & Routing", desc: "Single entry point for clients handling routing, JWT auth, rate limiting & SSL.", sec: "sec-microservices" },
+    { id: 2, name: "Load Balancer", cat: "Traffic & Routing", desc: "Distributes incoming traffic across multiple backend servers for HA & throughput.", sec: "sec-scalability" },
+    { id: 3, name: "Circuit Breaker", cat: "Resilience", desc: "Stops calling failing downstream services (fail fast) to prevent cascading outages.", sec: "sec-scalability" },
+    { id: 4, name: "Bulkhead", cat: "Resilience", desc: "Isolates resources (thread/connection pools) so failure in one module stays contained.", sec: "sec-scalability" },
+    { id: 5, name: "Retry", cat: "Resilience", desc: "Re-attempts transient failed operations using exponential backoff & max limits.", sec: "sec-distributed" },
+    { id: 6, name: "Idempotency", cat: "Distributed", desc: "Ensures performing the same request multiple times produces the exact same outcome.", sec: "sec-distributed" },
+    { id: 7, name: "Saga", cat: "Distributed", desc: "Manages distributed transactions across services via local steps & compensating rollbacks.", sec: "sec-distributed" },
+    { id: 8, name: "Strangler Fig", cat: "Distributed", desc: "Incrementally migrates a legacy monolith to microservices without a big-bang rewrite.", sec: "sec-distributed" },
+    { id: 9, name: "CQRS", cat: "Data & Caching", desc: "Separates Write (Command) and Read (Query) models to scale and optimize independently.", sec: "sec-cqrs" },
+    { id: 10, name: "Event Sourcing", cat: "Data & Caching", desc: "Stores every state change as an append-only sequence of immutable domain events.", sec: "sec-cqrs" },
+    { id: 11, name: "Replication", cat: "Data & Caching", desc: "Keeps copies of data across primary & replica nodes for HA, read scale & disaster recovery.", sec: "sec-database" },
+    { id: 12, name: "Sharding", cat: "Data & Caching", desc: "Horizontally splits massive datasets across multiple database instances via a shard key.", sec: "sec-database" },
+    { id: 13, name: "Caching", cat: "Data & Caching", desc: "Stores frequently accessed data in fast memory (Redis) to cut latency & DB load.", sec: "sec-caching" },
+    { id: 14, name: "Rate Limiting", cat: "Traffic & Routing", desc: "Caps the number of requests per client in a time window to stop abuse & spikes.", sec: "sec-scalability" },
+    { id: 15, name: "Throttling", cat: "Traffic & Routing", desc: "Deliberately slows down request processing rate rather than rejecting requests.", sec: "sec-scalability" },
+    { id: 16, name: "Backpressure", cat: "Traffic & Routing", desc: "Signals upstream producers to reduce emission rate when consumers are saturated.", sec: "sec-scalability" },
+    { id: 17, name: "Queueing", cat: "Traffic & Routing", desc: "Buffers burst traffic asynchronously in message queues for smooth worker processing.", sec: "sec-messaging" },
+    { id: 18, name: "Autoscaling", cat: "Traffic & Routing", desc: "Automatically adds or removes server instances based on live CPU, memory, or RPS.", sec: "sec-scalability" },
+    { id: 19, name: "Batch Processing", cat: "Processing", desc: "Processes massive historical data volumes in scheduled intervals (e.g., Spark ETL).", sec: "sec-data-processing" },
+    { id: 20, name: "Stream Processing", cat: "Processing", desc: "Processes continuous data event-by-event in real time (e.g., Apache Flink).", sec: "sec-data-processing" },
+    { id: 21, name: "Lambda Architecture", cat: "Processing", desc: "Combines Batch Layer (accuracy) + Speed Layer (low latency) into a Serving Layer.", sec: "sec-data-processing" },
+    { id: 22, name: "Kappa Architecture", cat: "Processing", desc: "Simplified stream-only architecture handling both live and reprocessed historical data.", sec: "sec-data-processing" },
+    { id: 23, name: "Active-Active", cat: "Availability", desc: "All geographic regions are live simultaneously and actively serve user traffic.", sec: "sec-reliability" },
+    { id: 24, name: "Active-Passive", cat: "Availability", desc: "Primary region serves traffic while standby region takes over on automated failover.", sec: "sec-reliability" },
+    { id: 25, name: "Disaster Recovery", cat: "Availability", desc: "Restores systems and data after catastrophic outages meeting RPO & RTO targets.", sec: "sec-reliability" }
+  ];
+
+  const CHECKLIST_ITEMS = [
+    "Understand and clearly explain all 25 architecture patterns",
+    "Master HLD & LLD for 3–5 real systems (Netflix, Uber, YouTube, WhatsApp, Instagram)",
+    "Practice back-of-the-envelope capacity estimation (QPS, storage, bandwidth)",
+    "Know when to apply each pattern with concrete trade-offs",
+    "Revise key NFRs, consistency models (Strong vs. Eventual), and SQL vs. NoSQL"
+  ];
+
+  const SECTION_ORDER = [
+    { id: "sec-overview", title: "01. OVERVIEW & MASTER CHEAT SHEET" },
+    { id: "sec-layered", title: "02. LAYERED & MONOLITHIC ARCHITECTURE" },
+    { id: "sec-microservices", title: "03. MICROSERVICES ARCHITECTURE" },
+    { id: "sec-event-driven", title: "04. EVENT-DRIVEN ARCHITECTURE" },
+    { id: "sec-messaging", title: "05. MESSAGE QUEUE & PUB/SUB" },
+    { id: "sec-cqrs", title: "06. CQRS & EVENT SOURCING" },
+    { id: "sec-database", title: "07. DATABASE ARCHITECTURE PATTERNS" },
+    { id: "sec-caching", title: "08. CACHING ARCHITECTURE PATTERNS" },
+    { id: "sec-scalability", title: "09. SCALABILITY & TRAFFIC MANAGEMENT" },
+    { id: "sec-distributed", title: "10. DISTRIBUTED SYSTEMS PATTERNS" },
+    { id: "sec-reliability", title: "11. RELIABILITY & FAULT TOLERANCE" },
+    { id: "sec-data-processing", title: "12. DATA PROCESSING PATTERNS" },
+    { id: "sec-case-studies", title: "13. REAL-WORLD CASE STUDIES" }
+  ];
+
+  /* --------------------------------------------------------------------------
+     2. NAVIGATION, THEME & STANDALONE EXPORT
+     -------------------------------------------------------------------------- */
+  let currentSecIdx = 0;
+
+  function switchSection(sectionId) {
+    document.querySelectorAll(".section-panel").forEach(p => p.classList.remove("active"));
+    const target = document.getElementById(sectionId);
+    if (target) target.classList.add("active");
+
+    document.querySelectorAll(".nav-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.target === sectionId);
+    });
+
+    const idx = SECTION_ORDER.findIndex(s => s.id === sectionId);
+    if (idx !== -1) {
+      currentSecIdx = idx;
+      document.getElementById("topBreadcrumb").textContent = "HANDBOOK // " + SECTION_ORDER[idx].title;
+      document.getElementById("prevSecBtn").disabled = idx === 0;
+      document.getElementById("nextSecBtn").disabled = idx === SECTION_ORDER.length - 1;
+    }
+
+    toggleSidebar(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function navigateStep(delta) {
+    const nextIdx = currentSecIdx + delta;
+    if (nextIdx >= 0 && nextIdx < SECTION_ORDER.length) {
+      switchSection(SECTION_ORDER[nextIdx].id);
+    }
+  }
+
+  function toggleSidebar(forceOpen) {
+    const sb = document.getElementById("sidebar");
+    const closeBtn = document.getElementById("closeSidebarBtn");
+    if (forceOpen) {
+      sb.classList.add("open");
+      closeBtn.style.display = "inline-flex";
+    } else {
+      sb.classList.remove("open");
+      closeBtn.style.display = "none";
+    }
+  }
+
+  function filterNavigation(query) {
+    const q = query.trim().toLowerCase();
+    document.querySelectorAll(".nav-item").forEach(item => {
+      const text = (item.textContent + " " + (item.dataset.keywords || "")).toLowerCase();
+      item.style.display = text.includes(q) ? "block" : "none";
+    });
+  }
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    const isDark = html.classList.toggle("dark");
+    document.getElementById("themeToggleBtn").textContent = isDark ? "☀️ Light Mode" : "🌙 Dark Mode";
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById("toastMsg");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2600);
+  }
+
+  function downloadStandaloneHTML() {
+    const doctype = "<!DOCTYPE html>\n";
+    const htmlContent = doctype + document.documentElement.outerHTML;
+    const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "system-design-25-patterns-handbook.html";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("Downloaded standalone index.html — ready to upload & host!");
+  }
+
+  /* --------------------------------------------------------------------------
+     3. SECTION 01: CHEAT SHEET TABLE, CAPACITY CALCULATOR & CHECKLIST
+     -------------------------------------------------------------------------- */
+  function renderPatternTable() {
+    const search = document.getElementById("patternSearch").value.trim().toLowerCase();
+    const cat = document.getElementById("patternCatFilter").value;
+    const tbody = document.getElementById("patternsTableBody");
+
+    const filtered = PATTERNS_25.filter(p => {
+      const matchCat = cat === "ALL" || p.cat === cat;
+      const matchTxt = p.name.toLowerCase().includes(search) || p.desc.toLowerCase().includes(search);
+      return matchCat && matchTxt;
+    });
+
+    tbody.innerHTML = filtered.map(p => `
+      <tr>
+        <td style="font-family:var(--font-mono); font-weight:700;">#${String(p.id).padStart(2, "0")}</td>
+        <td><strong>${p.name}</strong></td>
+        <td><span class="badge badge-blue">${p.cat}</span></td>
+        <td>${p.desc}</td>
+        <td><button class="btn btn-sm" onclick="switchSection('${p.sec}')">Open →</button></td>
+      </tr>
+    `).join("");
+  }
+
+  function calculateCapacity() {
+    const users = Math.max(1, Number(document.getElementById("calcUsers").value) || 0);
+    const reqPerUser = Math.max(1, Number(document.getElementById("calcReqPerUser").value) || 0);
+    const dataKB = Math.max(1, Number(document.getElementById("calcDataPerUser").value) || 0);
+    const respKB = Math.max(1, Number(document.getElementById("calcRespSize").value) || 0);
+    const buffer = Number(document.getElementById("calcBuffer").value) || 3;
+
+    const dailyReq = users * reqPerUser;
+    const avgQPS = dailyReq / 86400;
+    const peakQPS = avgQPS * buffer;
+
+    const totalBytes = users * dataKB * 1024;
+    const storageGB = totalBytes / (1024 ** 3);
+    const storageStr = storageGB >= 1024 ? (storageGB / 1024).toFixed(2) + " TB" : storageGB.toFixed(2) + " GB";
+
+    const bwBytesSec = avgQPS * respKB * 1024;
+    const bwMBs = bwBytesSec / (1024 ** 2);
+
+    const fmtNum = n => n >= 1e9 ? (n / 1e9).toFixed(2) + "B" : n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : n.toFixed(0);
+
+    document.getElementById("resDailyReq").textContent = fmtNum(dailyReq);
+    document.getElementById("resQPS").textContent = `${avgQPS.toFixed(1)} / ${peakQPS.toFixed(1)}`;
+    document.getElementById("resStorage").textContent = storageStr;
+    document.getElementById("resBandwidth").textContent = `${bwMBs.toFixed(2)} MB/s`;
+  }
+
+  function initChecklist() {
+    let saved = [];
+    try { saved = JSON.parse(localStorage.getItem("sd25_checklist") || "[]"); } catch (e) {}
+    const container = document.getElementById("revisionChecklist");
+
+    container.innerHTML = CHECKLIST_ITEMS.map((item, idx) => {
+      const checked = saved.includes(idx) ? "checked" : "";
+      return `
+        <label style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border-color); border-radius:8px; cursor:pointer; background:var(--bg-surface-alt);">
+          <input type="checkbox" ${checked} onchange="toggleChecklistItem(${idx}, this.checked)" style="width:17px; height:17px; accent-color:var(--accent);" />
+          <span style="font-size:0.9rem;">${item}</span>
+        </label>
+      `;
+    }).join("");
+    updateChecklistProgress(saved);
+  }
+
+  function toggleChecklistItem(idx, isChecked) {
+    let saved = [];
+    try { saved = JSON.parse(localStorage.getItem("sd25_checklist") || "[]"); } catch (e) {}
+    if (isChecked && !saved.includes(idx)) saved.push(idx);
+    if (!isChecked) saved = saved.filter(i => i !== idx);
+    try { localStorage.setItem("sd25_checklist", JSON.stringify(saved)); } catch (e) {}
+    updateChecklistProgress(saved);
+  }
+
+  function updateChecklistProgress(saved) {
+    const pct = Math.round((saved.length / CHECKLIST_ITEMS.length) * 100);
+    document.getElementById("checklistProgressLabel").textContent = `${saved.length} / ${CHECKLIST_ITEMS.length} Completed (${pct}%)`;
+    document.getElementById("checklistProgressBar").style.width = pct + "%";
+  }
+
+  /* --------------------------------------------------------------------------
+     4. SECTION 02 & 03: LAYERED & MICROSERVICES INTERACTIVITY
+     -------------------------------------------------------------------------- */
+  const LAYER_INFO = [
+    "<strong>Presentation Layer:</strong> Handles HTTP requests, input formatting, JWT/Session checks, and renders UI or JSON responses.",
+    "<strong>Business Logic Layer:</strong> Executes core domain rules, pricing calculations, eligibility validations, and workflow orchestration.",
+    "<strong>Data Access Layer:</strong> Abstracts persistence via Repositories/DAOs, ORM mappings, and parameterized SQL/NoSQL queries.",
+    "<strong>Database Layer:</strong> Durable physical storage engine (MySQL, PostgreSQL, MongoDB) managing indexes, ACID locks, and disk I/O."
+  ];
+
+  function selectLayer(idx) {
+    for (let i = 0; i < 4; i++) {
+      document.getElementById(`layer-${i}`).classList.toggle("highlight", i === idx);
+    }
+    document.getElementById("layerDetailLog").innerHTML = LAYER_INFO[idx];
+  }
+
+  function simulateMicroservice(type) {
+    const allIds = ["ms-client-web", "ms-client-mob", "ms-client-ext", "ms-gateway", "ms-svc-user", "ms-db-user", "ms-svc-order", "ms-db-order", "ms-svc-payment", "ms-db-payment"];
+    allIds.forEach(id => document.getElementById(id).classList.remove("highlight", "success-node"));
+
+    const map = {
+      user: { client: "ms-client-web", svc: "ms-svc-user", db: "ms-db-user", msg: "Web App → API Gateway (JWT Verified, Rate Limit OK) → User Service → User DB (PostgreSQL)" },
+      order: { client: "ms-client-mob", svc: "ms-svc-order", db: "ms-db-order", msg: "Mobile App → API Gateway (Routed /orders) → Order Service → Order DB (MySQL)" },
+      payment: { client: "ms-client-ext", svc: "ms-svc-payment", db: "ms-db-payment", msg: "External Client → API Gateway (mTLS + Auth) → Payment Service → Payment DB" }
+    };
+
+    const cfg = map[type];
+    document.getElementById(cfg.client).classList.add("highlight");
+    document.getElementById("ms-gateway").classList.add("highlight");
+    document.getElementById(cfg.svc).classList.add("success-node");
+    document.getElementById(cfg.db).classList.add("success-node");
+    document.getElementById("msSimLog").textContent = "✓ " + cfg.msg;
+  }
+
+  /* --------------------------------------------------------------------------
+     5. SECTION 04 & 05: EVENT-DRIVEN & MESSAGE QUEUE / PUB-SUB
+     -------------------------------------------------------------------------- */
+  function triggerEventFlow() {
+    const nodes = ["eda-producer", "eda-broker", "eda-c1", "eda-c2", "eda-c3"];
+    nodes.forEach(id => document.getElementById(id).classList.remove("highlight", "success-node"));
+
+    document.getElementById("eda-producer").classList.add("highlight");
+    document.getElementById("edaSimLog").textContent = "1/3: Order Service published OrderPlaced(orderId: #9041)...";
+
+    setTimeout(() => {
+      document.getElementById("eda-broker").classList.add("highlight");
+      document.getElementById("edaSimLog").textContent = "2/3: Event Broker persisted event to topic 'orders'...";
+    }, 450);
+
+    setTimeout(() => {
+      ["eda-c1", "eda-c2", "eda-c3"].forEach(id => document.getElementById(id).classList.add("success-node"));
+      document.getElementById("edaSimLog").textContent = "3/3: Payment, Notification & Analytics services consumed OrderPlaced asynchronously in parallel!";
+    }, 950);
+  }
+
+  let msgMode = "p2p";
+  let msgCounter = 0;
+
+  function setMsgMode(mode) {
+    msgMode = mode;
+    document.getElementById("btnModeP2P").classList.toggle("active-pill", mode === "p2p");
+    document.getElementById("btnModePubSub").classList.toggle("active-pill", mode === "pubsub");
+    renderMsgTopology();
+  }
+
+  function renderMsgTopology() {
+    const box = document.getElementById("msgTopologyCanvas");
+    if (msgMode === "p2p") {
+      box.innerHTML = `
+        <div class="blueprint-label"><span>MODE: POINT-TO-POINT MESSAGE QUEUE</span><span>1 Message → 1 Worker Consumer</span></div>
+        <div class="node-row">
+          <div class="arch-node highlight"><div class="node-title">Producer</div><div class="node-sub">Enqueues Job</div></div>
+          <div class="arrow-connector">→</div>
+          <div class="arch-node"><div class="node-title">Task Queue</div><div class="node-sub">FIFO Buffer</div></div>
+          <div class="arrow-connector">→</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div class="arch-node" id="p2p-w1"><div class="node-title">Worker Consumer A</div><div class="node-sub">Competing consumer</div></div>
+            <div class="arch-node" id="p2p-w2"><div class="node-title">Worker Consumer B</div><div class="node-sub">Competing consumer</div></div>
+          </div>
+        </div>
+        <div class="sim-log" id="msgSimLog">Point-to-Point: Each task in the queue is processed by strictly ONE worker (load distribution).</div>
+      `;
+    } else {
+      box.innerHTML = `
+        <div class="blueprint-label"><span>MODE: PUBLISH / SUBSCRIBE (TOPIC + CONSUMER GROUPS)</span><span>1 Event → All Subscribed Services</span></div>
+        <div class="node-row">
+          <div class="arch-node highlight"><div class="node-title">Publisher</div><div class="node-sub">Emits Event</div></div>
+          <div class="arrow-connector">→</div>
+          <div class="arch-node"><div class="node-title">Kafka Topic</div><div class="node-sub">Partition 0 &amp; 1</div></div>
+          <div class="arrow-connector">→</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div class="arch-node" id="ps-c1"><div class="node-title">Email Group (Subscriber A)</div><div class="node-sub">Receives copy</div></div>
+            <div class="arch-node" id="ps-c2"><div class="node-title">Analytics Group (Subscriber B)</div><div class="node-sub">Receives copy</div></div>
+          </div>
+        </div>
+        <div class="sim-log" id="msgSimLog">Pub/Sub: Every independent subscriber group receives a copy of the published message.</div>
+      `;
+    }
+  }
+
+  function sendBrokerMessage() {
+    msgCounter++;
+    if (msgMode === "p2p") {
+      const target = msgCounter % 2 === 1 ? "p2p-w1" : "p2p-w2";
+      const other = msgCounter % 2 === 1 ? "p2p-w2" : "p2p-w1";
+      document.getElementById(target).classList.add("success-node");
+      document.getElementById(other).classList.remove("success-node");
+      document.getElementById("msgSimLog").textContent = `Message #${msgCounter} delivered exclusively to ${target === "p2p-w1" ? "Worker Consumer A" : "Worker Consumer B"}.`;
+    } else {
+      document.getElementById("ps-c1").classList.add("success-node");
+      document.getElementById("ps-c2").classList.add("success-node");
+      document.getElementById("msgSimLog").textContent = `Event #${msgCounter} broadcast to BOTH Email Group and Analytics Group simultaneously!`;
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     6. SECTION 06: CQRS & EVENT SOURCING
+     -------------------------------------------------------------------------- */
+  let balA = 5000, balB = 2000;
+  let storedEvents = [
+    "#1 [AccountInitialized] Account A = ₹5,000",
+    "#2 [AccountInitialized] Account B = ₹2,000"
+  ];
+
+  function executeTransferCommand() {
+    if (balA < 1000) {
+      showToast("Insufficient balance in Account A!");
+      return;
+    }
+    balA -= 1000;
+    balB += 1000;
+    const n1 = storedEvents.length + 1;
+    const n2 = storedEvents.length + 2;
+    storedEvents.push(`#${n1} [AmountDebited] Account A (-₹1,000)`);
+    storedEvents.push(`#${n2} [AmountCredited] Account B (+₹1,000)`);
+
+    document.getElementById("cqrs-cmd").classList.add("highlight");
+    document.getElementById("cqrs-store").classList.add("highlight");
+    document.getElementById("cqrs-read").classList.add("success-node");
+
+    document.getElementById("eventCountLabel").textContent = `${storedEvents.length} Immutable Events Stored`;
+    document.getElementById("cqrsBalances").textContent = `Account A: ₹${balA.toLocaleString()} | Account B: ₹${balB.toLocaleString()}`;
+    document.getElementById("eventLogStream").innerHTML = storedEvents.map(e => `<div>${e}</div>`).join("");
+  }
+
+  function replayEventStore() {
+    document.getElementById("cqrsBalances").textContent = "Replaying events from offset 0...";
+    setTimeout(() => {
+      document.getElementById("cqrsBalances").textContent = `Rebuilt State → Account A: ₹${balA.toLocaleString()} | Account B: ₹${balB.toLocaleString()}`;
+      showToast(`Replayed ${storedEvents.length} events to rebuild Read Model!`);
+    }, 500);
+  }
+
+  /* --------------------------------------------------------------------------
+     7. SECTION 07: DATABASE SHARDING & REPLICATION
+     -------------------------------------------------------------------------- */
+  function routeShard() {
+    const val = (document.getElementById("shardUserInput").value || "A").trim().toUpperCase();
+    const firstChar = val.charAt(0) || "A";
+    ["shard-1", "shard-2", "shard-3"].forEach(id => document.getElementById(id).classList.remove("highlight"));
+
+    let shardId = "shard-1", range = "A – H";
+    if (firstChar >= "I" && firstChar <= "P") { shardId = "shard-2"; range = "I – P"; }
+    else if (firstChar >= "Q") { shardId = "shard-3"; range = "Q – Z"; }
+
+    document.getElementById(shardId).classList.add("highlight");
+    document.getElementById("shardRouterSub").textContent = `Key: "${val}" → Routed to ${shardId.toUpperCase()} (${range})`;
+  }
+
+  let repToggle = false;
+  function simDbQuery(kind) {
+    ["db-leader", "db-rep1", "db-rep2"].forEach(id => document.getElementById(id).classList.remove("highlight", "success-node"));
+    if (kind === "write") {
+      document.getElementById("db-leader").classList.add("highlight");
+      document.getElementById("dbRepLog").textContent = "WRITE routed to Leader (Primary DB) → Replicating WAL changes to Follower 1 & Follower 2.";
+    } else {
+      repToggle = !repToggle;
+      const target = repToggle ? "db-rep1" : "db-rep2";
+      document.getElementById(target).classList.add("success-node");
+      document.getElementById("dbRepLog").textContent = `READ load-balanced to ${repToggle ? "Follower 1" : "Follower 2"} (Read Replica), offloading Primary DB.`;
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     8. SECTION 08: CACHING PATTERNS
+     -------------------------------------------------------------------------- */
+  const CACHE_PATTERNS = {
+    aside: {
+      title: "(a) Cache-Aside (Lazy Loading) — Most Common",
+      flow: "1. App checks Cache → 2. On Cache Miss, App reads from DB → 3. App populates Cache for future reads.",
+      pros: "Only requested data is cached; resilient if cache goes down.",
+      cons: "Initial cache miss latency; potential stale data without TTL/invalidation."
+    },
+    through: {
+      title: "(b) Write-Through Caching",
+      flow: "1. App writes to Cache → 2. Cache synchronously writes to DB in the same transaction.",
+      pros: "Cache and DB are always strongly consistent; zero stale reads.",
+      cons: "Higher write latency (2 writes); infrequently read data still consumes RAM."
+    },
+    back: {
+      title: "(c) Write-Back (Write-Behind) Caching",
+      flow: "1. App writes directly to Cache (fast ACK) → 2. Cache asynchronously flushes batches to DB later.",
+      pros: "Ultra-fast write throughput; absorbs heavy write bursts.",
+      cons: "Risk of data loss if cache node crashes before async DB flush."
+    },
+    around: {
+      title: "(d) Write-Around Caching",
+      flow: "1. App writes directly to DB (bypassing Cache) → 2. Cache is populated only when data is later read.",
+      pros: "Prevents cache pollution from write-once / rarely-read logs.",
+      cons: "First read after a write always suffers a cache miss."
+    }
+  };
+
+  function selectCachePattern(key) {
+    ["aside", "through", "back", "around"].forEach(k => {
+      document.getElementById(`cacheBtn-${k}`).classList.toggle("active-pill", k === key);
+    });
+    const p = CACHE_PATTERNS[key];
+    document.getElementById("cachePatternCanvas").innerHTML = `
+      <div class="blueprint-label"><span>${p.title}</span><span>Redis / Memcached</span></div>
+      <div class="node-row mb-4">
+        <div class="arch-node highlight"><div class="node-title">Application Service</div></div>
+        <div class="arrow-connector">⇄</div>
+        <div class="arch-node success-node"><div class="node-title">In-Memory Cache</div><div class="node-sub">Sub-ms Latency</div></div>
+        <div class="arrow-connector">⇄</div>
+        <div class="arch-node"><div class="node-title">Primary Database</div><div class="node-sub">Disk Persistence</div></div>
+      </div>
+      <div class="sim-log" style="flex-direction:column; align-items:flex-start;">
+        <div><strong>Execution Flow:</strong> ${p.flow}</div>
+        <div style="margin-top:4px;"><span class="badge badge-green">Pros:</span> ${p.pros} &nbsp;|&nbsp; <span class="badge badge-amber">Cons:</span> ${p.cons}</div>
+      </div>
+    `;
+  }
+
+  /* --------------------------------------------------------------------------
+     9. SECTION 09: LOAD BALANCER & CIRCUIT BREAKER
+     -------------------------------------------------------------------------- */
+  let lbCounts = [0, 0, 0];
+  let rrIndex = 0;
+
+  function dispatchLBRequest() {
+    const algo = document.getElementById("lbAlgoSelect").value;
+    let targetIdx = 0;
+
+    if (algo === "rr") {
+      targetIdx = rrIndex % 3;
+      rrIndex++;
+    } else if (algo === "lc") {
+      const minVal = Math.min(...lbCounts);
+      targetIdx = lbCounts.indexOf(minVal);
+    } else if (algo === "weighted") {
+      const pattern = [0, 0, 1, 2]; // Server 1 gets 2x weight
+      targetIdx = pattern[rrIndex % 4];
+      rrIndex++;
+    }
+
+    lbCounts[targetIdx]++;
+    [1, 2, 3].forEach((n, i) => {
+      document.getElementById(`lb-c${n}`).textContent = `Reqs: ${lbCounts[i]}`;
+      document.getElementById(`lb-s${n}`).classList.toggle("success-node", i === targetIdx);
+    });
+    document.getElementById("lbSimLog").textContent = `Routed request via [${algo.toUpperCase()}] → Server ${targetIdx + 1}`;
+  }
+
+  function resetLB() {
+    lbCounts = [0, 0, 0];
+    rrIndex = 0;
+    [1, 2, 3].forEach(n => {
+      document.getElementById(`lb-c${n}`).textContent = "Reqs: 0";
+      document.getElementById(`lb-s${n}`).classList.remove("success-node");
+    });
+    document.getElementById("lbSimLog").textContent = "Counters reset.";
+  }
+
+  let cbState = "CLOSED";
+  let cbFailures = 0;
+
+  function cbCall(isSuccess) {
+    if (cbState === "OPEN") {
+      document.getElementById("cbSimLog").textContent = "⛔ Circuit is OPEN: Request blocked immediately (Fail-Fast) without hitting failing service!";
+      return;
+    }
+
+    if (isSuccess) {
+      cbFailures = 0;
+      cbState = "CLOSED";
+      updateCBVisuals();
+      document.getElementById("cbSimLog").textContent = "✅ Downstream call succeeded! Circuit is CLOSED (healthy).";
+    } else {
+      cbFailures++;
+      if (cbState === "HALF-OPEN" || cbFailures >= 3) {
+        cbState = "OPEN";
+        updateCBVisuals();
+        document.getElementById("cbSimLog").textContent = `💥 Failure threshold reached (${cbFailures}/3)! Circuit TRIPPED to OPEN.`;
+      } else {
+        updateCBVisuals();
+        document.getElementById("cbSimLog").textContent = `⚠️ Call failed (${cbFailures}/3 failures before tripping).`;
+      }
+    }
+  }
+
+  function cbTimeoutRecover() {
+    if (cbState === "OPEN") {
+      cbState = "HALF-OPEN";
+      updateCBVisuals();
+      document.getElementById("cbSimLog").textContent = "⏱ Cooldown elapsed → Circuit moved to HALF-OPEN. Send a Successful Call to close, or Failing Call to re-open.";
+    } else {
+      showToast("Cooldown applies when Circuit is OPEN.");
+    }
+  }
+
+  function updateCBVisuals() {
+    const badge = document.getElementById("cbBadgeState");
+    badge.textContent = `STATE: ${cbState}`;
+    badge.className = "badge " + (cbState === "CLOSED" ? "badge-green" : cbState === "OPEN" ? "badge-red" : "badge-amber");
+
+    document.getElementById("cb-closed").className = "arch-node" + (cbState === "CLOSED" ? " success-node" : "");
+    document.getElementById("cb-open").className = "arch-node" + (cbState === "OPEN" ? " danger-node" : "");
+    document.getElementById("cb-half").className = "arch-node" + (cbState === "HALF-OPEN" ? " warn-node" : "");
+  }
+
+  /* --------------------------------------------------------------------------
+     10. SECTION 10: SAGA & STRANGLER FIG
+     -------------------------------------------------------------------------- */
+  function runSaga(simulateFail) {
+    const o = document.getElementById("saga-order");
+    const p = document.getElementById("saga-pay");
+    const i = document.getElementById("saga-inv");
+    [o, p, i].forEach(el => el.className = "arch-node");
+
+    o.classList.add("success-node");
+    document.getElementById("saga-order-sub").textContent = "Order Created ✓";
+    document.getElementById("sagaSimLog").textContent = "Step 1: Order Service created Order...";
+
+    setTimeout(() => {
+      p.classList.add("success-node");
+      document.getElementById("saga-pay-sub").textContent = "Payment Charged ✓";
+      document.getElementById("sagaSimLog").textContent = "Step 2: Payment Service charged customer...";
+    }, 450);
+
+    setTimeout(() => {
+      if (!simulateFail) {
+        i.classList.add("success-node");
+        document.getElementById("saga-inv-sub").textContent = "Stock Reserved ✓";
+        document.getElementById("sagaSimLog").textContent = "✅ Saga Completed! All 3 local transactions committed.";
+      } else {
+        i.classList.add("danger-node");
+        document.getElementById("saga-inv-sub").textContent = "Out of Stock ✗";
+        document.getElementById("sagaSimLog").textContent = "💥 Inventory Failed! Triggering Compensating Rollbacks (Refund Payment + Cancel Order)...";
+        setTimeout(() => {
+          p.className = "arch-node warn-node";
+          o.className = "arch-node warn-node";
+          document.getElementById("saga-pay-sub").textContent = "Refunded (Compensated)";
+          document.getElementById("saga-order-sub").textContent = "Cancelled (Compensated)";
+        }, 650);
+      }
+    }, 950);
+  }
+
+  function updateStrangler(val) {
+    const newPct = Number(val);
+    const oldPct = 100 - newPct;
+    document.getElementById("stranglerPctBadge").textContent = `${newPct}% Migrated`;
+    document.getElementById("stranglerNewVal").textContent = `${newPct}%`;
+    document.getElementById("stranglerOldVal").textContent = `${oldPct}%`;
+  }
+
+  /* --------------------------------------------------------------------------
+     11. SECTION 11: MULTI-REGION FAILOVER
+     -------------------------------------------------------------------------- */
+  let drMode = "active-active";
+  let regionADown = false;
+
+  function setDRMode(mode) {
+    drMode = mode;
+    document.getElementById("drBtnAA").classList.toggle("active-pill", mode === "active-active");
+    document.getElementById("drBtnAP").classList.toggle("active-pill", mode === "active-passive");
+    renderDRCanvas();
+  }
+
+  function toggleRegionOutage() {
+    regionADown = !regionADown;
+    renderDRCanvas();
+  }
+
+  function renderDRCanvas() {
+    const box = document.getElementById("drCanvas");
+    const regAClass = regionADown ? "danger-node" : "success-node";
+    const regAStatus = regionADown ? "OFFLINE (Outage)" : "ACTIVE (Serving Traffic)";
+    const regBClass = (drMode === "active-active" || regionADown) ? "success-node" : "warn-node";
+    const regBStatus = drMode === "active-active"
+      ? (regionADown ? "ACTIVE (100% Failover Load)" : "ACTIVE (50% Load Sharing)")
+      : (regionADown ? "PROMOTED TO ACTIVE (Failover)" : "STANDBY (Passive Backup)");
+
+    box.innerHTML = `
+      <div class="blueprint-label"><span>MODEL: ${drMode.toUpperCase()}</span><span>${regionADown ? "⚠️ REGION A OUTAGE DETECTED" : "✅ ALL REGIONS HEALTHY"}</span></div>
+      <div class="node-row">
+        <div class="arch-node highlight"><div class="node-title">Global DNS / Anycast LB</div><div class="node-sub">Health Checks + Routing</div></div>
+        <div class="arrow-connector">➔</div>
+        <div class="arch-node ${regAClass}"><div class="node-title">Region A (US-East)</div><div class="node-sub">${regAStatus}</div></div>
+        <div class="arch-node ${regBClass}"><div class="node-title">Region B (EU-West)</div><div class="node-sub">${regBStatus}</div></div>
+      </div>
+    `;
+  }
+
+  /* --------------------------------------------------------------------------
+     12. SECTION 12: DATA PROCESSING ARCHITECTURES
+     -------------------------------------------------------------------------- */
+  const DATA_PATTERNS = {
+    batch: {
+      title: "Batch Processing Architecture (High Throughput, Scheduled)",
+      diagram: `
+        <div class="node-row">
+          <div class="arch-node"><div class="node-title">Raw Data Lake / Logs</div><div class="node-sub">S3 / HDFS</div></div>
+          <div class="arrow-connector">→ Hourly/Daily →</div>
+          <div class="arch-node highlight"><div class="node-title">Batch Processor</div><div class="node-sub">Apache Spark / Hive</div></div>
+          <div class="arrow-connector">→</div>
+          <div class="arch-node success-node"><div class="node-title">Data Warehouse</div><div class="node-sub">Daily Sales Reports</div></div>
+        </div>`,
+      note: "Pros: Cost-efficient for massive historical ETL. Cons: Higher latency (not real-time)."
+    },
+    stream: {
+      title: "Stream Processing Architecture (Low Latency, Continuous)",
+      diagram: `
+        <div class="node-row">
+          <div class="arch-node"><div class="node-title">Live Event Stream</div><div class="node-sub">Kafka / Kinesis</div></div>
+          <div class="arrow-connector">→ Event-by-Event →</div>
+          <div class="arch-node highlight"><div class="node-title">Stream Processor</div><div class="node-sub">Apache Flink / Spark Streaming</div></div>
+          <div class="arrow-connector">→</div>
+          <div class="arch-node success-node"><div class="node-title">Live Dashboards &amp; Alerts</div><div class="node-sub">Sub-second insights</div></div>
+        </div>`,
+      note: "Pros: Real-time fraud detection, surge pricing & live metrics. Cons: Higher operational complexity."
+    },
+    lambda: {
+      title: "Lambda Architecture (Batch Layer + Speed Layer)",
+      diagram: `
+        <div class="node-row">
+          <div class="arch-node"><div class="node-title">Immutable Master Data</div><div class="node-sub">Kafka + S3</div></div>
+          <div class="arrow-connector">➔</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div class="arch-node"><div class="node-title">Batch Layer (Spark)</div><div class="node-sub">Accurate Historical Views</div></div>
+            <div class="arch-node highlight"><div class="node-title">Speed Layer (Flink)</div><div class="node-sub">Real-Time Delta Views</div></div>
+          </div>
+          <div class="arrow-connector">➔</div>
+          <div class="arch-node success-node"><div class="node-title">Serving Layer</div><div class="node-sub">Merges Batch + Speed</div></div>
+        </div>`,
+      note: "Pros: Combines high historical accuracy with real-time low latency. Cons: Maintaining two separate codebases."
+    },
+    kappa: {
+      title: "Kappa Architecture (Unified Stream-Only Pipeline)",
+      diagram: `
+        <div class="node-row">
+          <div class="arch-node"><div class="node-title">Append-Only Event Log</div><div class="node-sub">Apache Kafka (Long Retention)</div></div>
+          <div class="arrow-connector">→ Single Pipeline →</div>
+          <div class="arch-node highlight"><div class="node-title">Unified Stream Engine</div><div class="node-sub">Apache Flink (Live + Replay)</div></div>
+          <div class="arrow-connector">→</div>
+          <div class="arch-node success-node"><div class="node-title">Serving Store</div><div class="node-sub">Elastic / Cassandra</div></div>
+        </div>`,
+      note: "Pros: Single codebase; historical recomputation done by replaying Kafka stream. Cons: Replaying petabytes can be costly."
+    }
+  };
+
+  function selectDataPattern(key) {
+    ["batch", "stream", "lambda", "kappa"].forEach(k => {
+      document.getElementById(`dpBtn-${k}`).classList.toggle("active-pill", k === key);
+    });
+    const d = DATA_PATTERNS[key];
+    document.getElementById("dataPipelineCanvas").innerHTML = `
+      <div class="blueprint-label"><span>${d.title}</span></div>
+      ${d.diagram}
+      <div class="sim-log">${d.note}</div>
+    `;
+  }
+
+  /* --------------------------------------------------------------------------
+     13. SECTION 13: REAL-WORLD CASE STUDIES (Netflix, Uber, WhatsApp, YouTube, Instagram)
+     -------------------------------------------------------------------------- */
+  const CASE_STUDIES = {
+    netflix: {
+      name: "Netflix — Global Video Streaming Platform",
+      reqs: ["Stream 4K video to millions with minimal buffering", "Personalized ML recommendations", "99.99% global availability"],
+      nodes: ["Client (TV/Web/Mobile)", "AWS API Gateway", "Microservices (Auth, Streaming, ML Recs)", "Open Connect CDN + Cassandra/S3"],
+      patterns: ["Microservices", "Global CDN (Edge Caching)", "Circuit Breaker (Hystrix)", "Multi-Region Active-Active", "Batch + Stream ML"]
+    },
+    uber: {
+      name: "Uber — Real-Time Ride Hailing Platform",
+      reqs: ["Sub-second rider-to-driver matching", "Live GPS location streaming at peak traffic", "Reliable payments & surge pricing"],
+      nodes: ["Rider/Driver Mobile App", "API Gateway + WebSockets", "Ride Matching, GeoLocation & Payment Services", "Kafka + Redis + MySQL/Cassandra"],
+      patterns: ["Event-Driven (Kafka)", "Geospatial Indexing (GeoHash/H3)", "Persistent WebSockets", "Bulkhead Isolation", "Stream Surge Pricing"]
+    },
+    whatsapp: {
+      name: "WhatsApp — Real-Time Messaging Platform",
+      reqs: ["Billions of daily 1:1 & group messages with low latency", "Online/offline presence & read receipts", "End-to-end encryption (E2EE)"],
+      nodes: ["Mobile App (iOS/Android)", "Edge Load Balancer", "Messaging & Presence Service (Erlang/XMPP)", "Cassandra Message Store + S3/CDN Media"],
+      patterns: ["Persistent Connections (XMPP/WebSocket)", "Horizontal Sharding", "Object Store + CDN for Media", "Transient Queueing"]
+    },
+    youtube: {
+      name: "YouTube — Global Video Sharing Platform",
+      reqs: ["Ingest massive raw video uploads", "Transcode into multiple resolutions (360p–4K)", "Serve billions of views globally"],
+      nodes: ["Creator/Viewer Client", "API Gateway", "Upload → Queue → Transcoding Workers", "Object Storage (GCS) + Global CDN + Spanner/Bigtable"],
+      patterns: ["Asynchronous Queueing", "Distributed Transcoding Pipeline", "Global CDN Delivery", "CQRS / Metadata Sharding"]
+    },
+    instagram: {
+      name: "Instagram — Photo, Reels & Social Feed Platform",
+      reqs: ["High-volume photo/video uploads", "Low-latency home timeline generation", "Real-time likes, comments & DMs"],
+      nodes: ["Mobile/Web Client", "API Gateway", "User, Feed (Timeline), Media & Notification Services", "Redis Feed Cache + S3/CDN + Postgres/Cassandra"],
+      patterns: ["Fan-out on Write / Hybrid Feed", "Redis Timeline Caching", "CDN Media Acceleration", "Async Notification Workers"]
+    }
+  };
+
+  function selectCaseStudy(key) {
+    ["netflix", "uber", "whatsapp", "youtube", "instagram"].forEach(k => {
+      document.getElementById(`csBtn-${k}`).classList.toggle("active-pill", k === key);
+    });
+    const cs = CASE_STUDIES[key];
+    document.getElementById("caseStudyContainer").innerHTML = `
+      <h3 style="font-size:1.2rem; font-weight:800; margin-bottom:14px; color:var(--accent);">${cs.name}</h3>
+      <div class="blueprint-box mb-4">
+        <div class="blueprint-label"><span>HIGH-LEVEL ARCHITECTURE FLOW</span></div>
+        <div class="node-row">
+          ${cs.nodes.map((n, i) => `
+            <div class="arch-node ${i === 2 ? 'highlight' : i === 3 ? 'success-node' : ''}">
+              <div class="node-title">${n}</div>
+            </div>
+            ${i < cs.nodes.length - 1 ? '<div class="arrow-connector">→</div>' : ''}
+          `).join("")}
+        </div>
+      </div>
+      <div class="grid-2">
+        <div>
+          <strong style="font-size:0.86rem; display:block; margin-bottom:8px;">Core System Requirements</strong>
+          <ul class="check-list">
+            ${cs.reqs.map(r => `<li>${r}</li>`).join("")}
+          </ul>
+        </div>
+        <div>
+          <strong style="font-size:0.86rem; display:block; margin-bottom:8px;">Key Architecture Patterns Applied</strong>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            ${cs.patterns.map(p => `<span class="badge badge-purple">${p}</span>`).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /* --------------------------------------------------------------------------
+     14. INITIALIZE ALL INTERACTIVE MODULES ON LOAD
+     -------------------------------------------------------------------------- */
+  window.addEventListener("DOMContentLoaded", () => {
+    renderPatternTable();
+    calculateCapacity();
+    initChecklist();
+    renderMsgTopology();
+    selectCachePattern("aside");
+    renderDRCanvas();
+    selectDataPattern("batch");
+    selectCaseStudy("netflix");
+  });
+</script>
+</body>
+</html>
